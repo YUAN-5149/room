@@ -75,6 +75,18 @@ const App: React.FC = () => {
   // Tenant CRUD handlers
   const handleAddTenant = (newTenant: Tenant) => {
     setTenants(prev => [...prev, newTenant]);
+    
+    // Auto-create a payment record for the new tenant for synchronization
+    const newPayment: PaymentRecord = {
+      id: `pay-${Date.now()}`,
+      tenantId: newTenant.id,
+      tenantName: newTenant.name, // Fallback, Financials view will use dynamic name
+      amount: newTenant.rentAmount,
+      dueDate: new Date().toISOString().split('T')[0], // Today as due date for demo
+      status: PaymentStatus.PENDING,
+      type: 'Rent'
+    };
+    setPayments(prev => [newPayment, ...prev]);
   };
 
   const handleUpdateTenant = (updatedTenant: Tenant) => {
@@ -84,6 +96,8 @@ const App: React.FC = () => {
   const handleDeleteTenant = (id: string) => {
     if (window.confirm('確定要刪除這位租客資料嗎？此操作無法復原。')) {
       setTenants(prev => prev.filter(t => t.id !== id));
+      // Optional: Remove payments associated with this tenant? 
+      // Keeping them for historical records usually, but could filter here.
     }
   };
 
@@ -104,7 +118,13 @@ const App: React.FC = () => {
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
             <Routes>
               <Route path="/" element={<Dashboard payments={payments} />} />
-              <Route path="/financials" element={<Financials payments={payments} onUpdatePayment={handleUpdatePayment} />} />
+              <Route path="/financials" element={
+                <Financials 
+                    payments={payments} 
+                    tenants={tenants}
+                    onUpdatePayment={handleUpdatePayment} 
+                />
+              } />
               <Route path="/contracts" element={
                 <Contracts 
                   tenants={tenants} 
