@@ -122,7 +122,7 @@ const Financials: React.FC<FinancialsProps> = ({ payments, onUpdatePayment }) =>
                   <tr>
                     <td colSpan={6} className="px-6 py-4 bg-amber-50">
                       <div className="flex flex-col gap-2">
-                        <label className="text-xs font-bold text-amber-900">AI 建議催繳訊息：</label>
+                        <label className="text-xs font-bold text-amber-900">建議催繳訊息：</label>
                         <textarea 
                           readOnly 
                           className="w-full p-2 text-sm border border-amber-200 rounded text-stone-700 h-24 bg-white"
