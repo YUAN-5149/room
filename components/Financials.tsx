@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { PaymentRecord, PaymentStatus } from '../types';
-import { generatePaymentReminder } from '../services/geminiService';
-import { CheckCircle, FileSpreadsheet, MessageSquare } from 'lucide-react';
+import { CheckCircle, FileSpreadsheet } from 'lucide-react';
 
 interface FinancialsProps {
   payments: PaymentRecord[];
@@ -11,8 +10,6 @@ interface FinancialsProps {
 
 const Financials: React.FC<FinancialsProps> = ({ payments, onUpdatePayment }) => {
   const [filter, setFilter] = useState<PaymentStatus | 'ALL'>('ALL');
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [reminderMessage, setReminderMessage] = useState<{ id: string; text: string } | null>(null);
 
   const filteredPayments = payments.filter(p => filter === 'ALL' || p.status === filter);
 
@@ -27,18 +24,6 @@ const Financials: React.FC<FinancialsProps> = ({ payments, onUpdatePayment }) =>
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Financials");
     XLSX.writeFile(wb, "Rent_Report.xlsx");
-  };
-
-  const handleDraftReminder = async (record: PaymentRecord) => {
-    setGeneratingId(record.id);
-    const today = new Date();
-    const due = new Date(record.dueDate);
-    const diffTime = Math.abs(today.getTime() - due.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-    
-    const message = await generatePaymentReminder(record, diffDays);
-    setReminderMessage({ id: record.id, text: message });
-    setGeneratingId(null);
   };
 
   return (
@@ -103,49 +88,8 @@ const Financials: React.FC<FinancialsProps> = ({ payments, onUpdatePayment }) =>
                         <CheckCircle size={18} />
                       </button>
                     )}
-                    {payment.status === PaymentStatus.OVERDUE && (
-                      <button 
-                        onClick={() => handleDraftReminder(payment)}
-                        className="text-amber-600 hover:text-amber-800 flex items-center gap-1"
-                        disabled={generatingId === payment.id}
-                      >
-                        {generatingId === payment.id ? (
-                          <span className="animate-spin text-xs">...</span>
-                        ) : (
-                          <MessageSquare size={18} />
-                        )}
-                      </button>
-                    )}
                   </td>
                 </tr>
-                {reminderMessage?.id === payment.id && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 bg-amber-50">
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs font-bold text-amber-900">建議催繳訊息：</label>
-                        <textarea 
-                          readOnly 
-                          className="w-full p-2 text-sm border border-amber-200 rounded text-stone-700 h-24 bg-white"
-                          value={reminderMessage.text}
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button 
-                            onClick={() => navigator.clipboard.writeText(reminderMessage.text)}
-                            className="text-xs bg-white border border-amber-200 text-stone-600 px-3 py-1 rounded hover:bg-orange-100"
-                          >
-                            複製文字
-                          </button>
-                          <button 
-                            onClick={() => setReminderMessage(null)}
-                            className="text-xs text-stone-500 px-3 py-1 hover:text-stone-700"
-                          >
-                            關閉
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
               </React.Fragment>
             ))}
           </tbody>
