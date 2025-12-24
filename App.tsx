@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, DollarSign, FileText, Wrench, Menu, X } from 'lucide-react';
 
@@ -8,7 +8,7 @@ import Contracts from './components/Contracts';
 import Maintenance from './components/Maintenance';
 
 import { mockPayments, mockTenants, mockTickets, mockFilters } from './services/mockData';
-import { PaymentRecord, PaymentStatus, MaintenanceTicket, MaintenanceStatus } from './types';
+import { PaymentRecord, PaymentStatus, MaintenanceTicket, MaintenanceStatus, Tenant } from './types';
 
 // Sidebar Navigation Component
 const Sidebar = ({ mobileOpen, setMobileOpen }: { mobileOpen: boolean, setMobileOpen: (open: boolean) => void }) => {
@@ -16,7 +16,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: { mobileOpen: boolean, setMobile
   const navItems = [
     { path: '/', label: '總覽看板', icon: LayoutDashboard },
     { path: '/financials', label: '財務管理', icon: DollarSign },
-    { path: '/contracts', label: '合約文件', icon: FileText },
+    { path: '/contracts', label: '合約與租客', icon: FileText },
     { path: '/maintenance', label: '維修管理', icon: Wrench },
   ];
 
@@ -60,14 +60,31 @@ const App: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [payments, setPayments] = useState<PaymentRecord[]>(mockPayments);
   const [tickets, setTickets] = useState<MaintenanceTicket[]>(mockTickets);
+  // Manage tenants state here to allow editing
+  const [tenants, setTenants] = useState<Tenant[]>(mockTenants);
 
-  // Handlers for updating state (in a real app, these would call an API)
+  // Handlers for updating state
   const handleUpdatePayment = (id: string, status: PaymentStatus) => {
     setPayments(prev => prev.map(p => p.id === id ? { ...p, status } : p));
   };
 
   const handleUpdateTicket = (id: string, status: MaintenanceStatus) => {
     setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+  };
+
+  // Tenant CRUD handlers
+  const handleAddTenant = (newTenant: Tenant) => {
+    setTenants(prev => [...prev, newTenant]);
+  };
+
+  const handleUpdateTenant = (updatedTenant: Tenant) => {
+    setTenants(prev => prev.map(t => t.id === updatedTenant.id ? updatedTenant : t));
+  };
+
+  const handleDeleteTenant = (id: string) => {
+    if (window.confirm('確定要刪除這位租客資料嗎？此操作無法復原。')) {
+      setTenants(prev => prev.filter(t => t.id !== id));
+    }
   };
 
   return (
@@ -88,7 +105,14 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Dashboard payments={payments} />} />
               <Route path="/financials" element={<Financials payments={payments} onUpdatePayment={handleUpdatePayment} />} />
-              <Route path="/contracts" element={<Contracts tenants={mockTenants} />} />
+              <Route path="/contracts" element={
+                <Contracts 
+                  tenants={tenants} 
+                  onAddTenant={handleAddTenant}
+                  onUpdateTenant={handleUpdateTenant}
+                  onDeleteTenant={handleDeleteTenant}
+                />
+              } />
               <Route path="/maintenance" element={<Maintenance tickets={tickets} filters={mockFilters} onUpdateTicketStatus={handleUpdateTicket} />} />
             </Routes>
           </main>
