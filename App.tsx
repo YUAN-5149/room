@@ -68,9 +68,28 @@ const App: React.FC = () => {
     setPayments(prev => prev.map(p => p.id === id ? { ...p, status } : p));
   };
 
-  const handleUpdateTicket = (id: string, status: MaintenanceStatus) => {
+  const handleDeletePayment = (id: string) => {
+    // Confirmation is now handled in the Financials component UI
+    setPayments(prev => prev.filter(p => p.id !== id));
+  };
+
+  // Maintenance Ticket Handlers
+  const handleAddTicket = (ticket: MaintenanceTicket) => {
+    setTickets(prev => [ticket, ...prev]);
+  };
+
+  const handleUpdateTicket = (updatedTicket: MaintenanceTicket) => {
+    setTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+  };
+
+  const handleUpdateTicketStatus = (id: string, status: MaintenanceStatus) => {
     setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
   };
+
+  const handleDeleteTicket = (id: string) => {
+     setTickets(prev => prev.filter(t => t.id !== id));
+  };
+
 
   // Tenant CRUD handlers
   const handleAddTenant = (newTenant: Tenant) => {
@@ -122,7 +141,8 @@ const App: React.FC = () => {
                 <Financials 
                     payments={payments} 
                     tenants={tenants}
-                    onUpdatePayment={handleUpdatePayment} 
+                    onUpdatePayment={handleUpdatePayment}
+                    onDeletePayment={handleDeletePayment}
                 />
               } />
               <Route path="/contracts" element={
@@ -133,7 +153,17 @@ const App: React.FC = () => {
                   onDeleteTenant={handleDeleteTenant}
                 />
               } />
-              <Route path="/maintenance" element={<Maintenance tickets={tickets} filters={mockFilters} onUpdateTicketStatus={handleUpdateTicket} />} />
+              <Route path="/maintenance" element={
+                <Maintenance 
+                  tickets={tickets} 
+                  filters={mockFilters} 
+                  tenants={tenants}
+                  onAddTicket={handleAddTicket}
+                  onUpdateTicket={handleUpdateTicket}
+                  onDeleteTicket={handleDeleteTicket}
+                  onUpdateTicketStatus={handleUpdateTicketStatus} 
+                />
+              } />
             </Routes>
           </main>
         </div>
