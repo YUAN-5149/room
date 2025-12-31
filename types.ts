@@ -38,7 +38,7 @@ export interface PaymentRecord {
   dueDate: string;
   paidDate?: string;
   status: PaymentStatus;
-  type: 'Rent' | 'Utility' | 'Other';
+  type: 'Rent' | 'Utility' | 'Deposit' | 'Other';
 }
 
 export interface MaintenanceTicket {
@@ -56,7 +56,10 @@ export interface MaintenanceTicket {
 
 export interface FilterSchedule {
   id: string;
-  location: string; // e.g., "Building A - 2F Common Area"
+  model: string;         // e.g., "UF-591"
+  specification: string; // e.g., "5微米PP濾芯"
+  cycleMonths: number;   // e.g., 6
+  location: string;      // e.g., "1F 公共區域"
   lastReplaced: string;
   nextDue: string;
   status: 'Good' | 'Due Soon' | 'Overdue';

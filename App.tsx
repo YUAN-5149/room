@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, DollarSign, FileText, Wrench, Menu, X, LogOut } from 'lucide-react';
 
@@ -77,17 +77,14 @@ const Sidebar = ({
 };
 
 const App: React.FC = () => {
-  // Auth State
   const [user, setUser] = useState<User | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // App Data State
   const [mobileOpen, setMobileOpen] = useState(false);
   const [payments, setPayments] = useState<PaymentRecord[]>(mockPayments);
   const [tickets, setTickets] = useState<MaintenanceTicket[]>(mockTickets);
   const [tenants, setTenants] = useState<Tenant[]>(mockTenants);
 
-  // Auth Handlers
   const handleLogin = (phone: string) => {
     const verifiedUser = verifyUser(phone);
     if (verifiedUser) {
@@ -103,7 +100,6 @@ const App: React.FC = () => {
     setLoginError(null);
   };
 
-  // --- Handlers for Data Updates ---
   const handleUpdatePayment = (id: string, status: PaymentStatus) => {
     setPayments(prev => prev.map(p => p.id === id ? { ...p, status } : p));
   };
@@ -128,37 +124,68 @@ const App: React.FC = () => {
      setTickets(prev => prev.filter(t => t.id !== id));
   };
 
-  const handleAddTenant = (newTenant: Tenant) => {
-    setTenants(prev => [...prev, newTenant]);
+  const handleAddTenant = (newTenant: Tenant, options?: { genRent: boolean, genDeposit: boolean }) => {
+    const tenantId = newTenant.id || `t-${Date.now()}`;
+    const tenantWithId = { ...newTenant, id: tenantId };
     
-    const newPayment: PaymentRecord = {
-      id: `pay-${Date.now()}`,
-      tenantId: newTenant.id,
-      tenantName: newTenant.name, 
-      amount: newTenant.rentAmount,
-      dueDate: new Date().toISOString().split('T')[0],
-      status: PaymentStatus.PENDING,
-      type: 'Rent'
-    };
-    setPayments(prev => [newPayment, ...prev]);
+    setTenants(prev => [...prev, tenantWithId]);
+    
+    const newPayments: PaymentRecord[] = [];
+
+    // 隨機後綴確保 ID 絕對不重複
+    const randomSuffix = () => Math.floor(Math.random() * 1000).toString();
+
+    // 根據房東選擇決定是否產生帳單
+    if (options?.genRent) {
+      newPayments.push({
+        id: `pay-r-${Date.now()}-${randomSuffix()}`,
+        tenantId: tenantId,
+        tenantName: newTenant.name, 
+        amount: newTenant.rentAmount,
+        dueDate: new Date().toISOString().split('T')[0],
+        status: PaymentStatus.PENDING,
+        type: 'Rent'
+      });
+    }
+    
+    if (options?.genDeposit) {
+      newPayments.push({
+        id: `pay-d-${Date.now()}-${randomSuffix()}`,
+        tenantId: tenantId,
+        tenantName: newTenant.name, 
+        amount: newTenant.deposit,
+        dueDate: new Date().toISOString().split('T')[0],
+        status: PaymentStatus.PENDING,
+        type: 'Deposit'
+      });
+    }
+    
+    if (newPayments.length > 0) {
+      setPayments(prev => [...newPayments, ...prev]);
+    }
   };
 
   const handleUpdateTenant = (updatedTenant: Tenant) => {
     setTenants(prev => prev.map(t => t.id === updatedTenant.id ? updatedTenant : t));
+    setPayments(prev => prev.map(p => p.tenantId === updatedTenant.id ? { 
+      ...p, 
+      tenantName: updatedTenant.name,
+      amount: (p.type === 'Rent' && p.status !== PaymentStatus.PAID) ? updatedTenant.rentAmount : p.amount
+    } : p));
   };
 
   const handleDeleteTenant = (id: string) => {
-    if (window.confirm('確定要刪除這位租客資料嗎？此操作無法復原。')) {
+    if (window.confirm('確定要刪除這位租客資料嗎？此操作將同步刪除該租客的所有財務紀錄與報修單，且無法復原。')) {
       setTenants(prev => prev.filter(t => t.id !== id));
+      setPayments(prev => prev.filter(p => p.tenantId !== id));
+      setTickets(prev => prev.filter(t => t.tenantId !== id));
     }
   };
 
-  // Render Login if not authenticated
   if (!user) {
     return <Login onLogin={handleLogin} error={loginError} />;
   }
 
-  // Render Main App if authenticated
   return (
     <HashRouter>
       <div className="flex h-screen overflow-hidden bg-orange-50">
@@ -170,7 +197,6 @@ const App: React.FC = () => {
         />
         
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Top Header Mobile */}
           <header className="md:hidden bg-white shadow-sm p-4 flex items-center justify-between z-20 border-b border-orange-100">
              <h1 className="font-bold text-stone-800">SmartLandlord Pro</h1>
              <button onClick={() => setMobileOpen(true)} className="text-stone-600">
@@ -192,6 +218,7 @@ const App: React.FC = () => {
               <Route path="/contracts" element={
                 <Contracts 
                   tenants={tenants} 
+                  payments={payments} 
                   onAddTenant={handleAddTenant}
                   onUpdateTenant={handleUpdateTenant}
                   onDeleteTenant={handleDeleteTenant}

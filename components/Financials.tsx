@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { PaymentRecord, PaymentStatus, Tenant } from '../types';
-import { FileSpreadsheet, Home, Trash2, AlertTriangle } from 'lucide-react';
+import { FileSpreadsheet, Home, Trash2, AlertTriangle, Wallet } from 'lucide-react';
 
 interface FinancialsProps {
   payments: PaymentRecord[];
@@ -12,12 +12,10 @@ interface FinancialsProps {
 
 const Financials: React.FC<FinancialsProps> = ({ payments, tenants, onUpdatePayment, onDeletePayment }) => {
   const [filter, setFilter] = useState<PaymentStatus | 'ALL'>('ALL');
-  // State for delete confirmation modal
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const filteredPayments = payments.filter(p => filter === 'ALL' || p.status === filter);
 
-  // Helper to get tenant info safely
   const getTenantInfo = (tenantId: string) => {
     return tenants.find(t => t.id === tenantId) || { name: '未知租客', roomNumber: '未知' };
   };
@@ -31,7 +29,7 @@ const Financials: React.FC<FinancialsProps> = ({ payments, tenants, onUpdatePaym
             金額: p.amount,
             到期日: p.dueDate,
             狀態: p.status,
-            類別: p.type
+            類別: p.type === 'Rent' ? '租金' : p.type === 'Deposit' ? '押金' : '其他'
         };
     });
 
@@ -53,6 +51,14 @@ const Financials: React.FC<FinancialsProps> = ({ payments, tenants, onUpdatePaym
         case PaymentStatus.PAID: return 'bg-emerald-100 text-emerald-800 border-emerald-200';
         case PaymentStatus.OVERDUE: return 'bg-rose-100 text-rose-800 border-rose-200';
         default: return 'bg-amber-100 text-amber-800 border-amber-200';
+    }
+  };
+
+  const getTypeBadge = (type: string) => {
+    switch (type) {
+        case 'Rent': return <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded font-bold border border-amber-100">租金</span>;
+        case 'Deposit': return <span className="text-[10px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded font-bold border border-indigo-100">押金</span>;
+        default: return <span className="text-[10px] px-1.5 py-0.5 bg-stone-50 text-stone-500 rounded font-bold border border-stone-100">其他</span>;
     }
   };
 
@@ -86,7 +92,7 @@ const Financials: React.FC<FinancialsProps> = ({ payments, tenants, onUpdatePaym
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">房號</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">租客</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">金額</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">款項內容</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">到期日</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">狀態 (可編輯)</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">操作</th>
@@ -104,9 +110,13 @@ const Financials: React.FC<FinancialsProps> = ({ payments, tenants, onUpdatePaym
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-800">
                     {tenant.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-800 font-semibold">
-                    ${payment.amount.toLocaleString()} 
-                    <span className="text-xs text-stone-400 ml-1 font-normal">({payment.type === 'Rent' ? '租金' : payment.type})</span>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm text-stone-800 font-semibold">${payment.amount.toLocaleString()}</span>
+                      <div className="flex gap-1">
+                        {getTypeBadge(payment.type)}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{payment.dueDate}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -136,7 +146,7 @@ const Financials: React.FC<FinancialsProps> = ({ payments, tenants, onUpdatePaym
         </table>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Modal */}
       {deleteTargetId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full overflow-hidden transform transition-all scale-100">

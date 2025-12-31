@@ -18,6 +18,11 @@ const WHITELIST: User[] = [
     phone: '0912570503',
     name: '管理員小陳',
     role: 'ADMIN'
+  },
+  {
+    phone: '0952337781',
+    name: '授權管理員',
+    role: 'ADMIN'
   }
 ];
 
