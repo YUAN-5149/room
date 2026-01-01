@@ -8,7 +8,7 @@ import { Tenant } from '../types';
 // 3. 將部署後取得的網址 (以 /exec 結尾) 貼在下方引號中。
 //    (請勿直接貼上 Google Sheet 的網址，那樣無法運作)
 // ============================================================================
-export const GOOGLE_SCRIPT_URL = ""; 
+export const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwczxcccdrvLXT26Ly_wi_l9lRFXDV2UPCEPW2XPfN1TV821-14PiewT7ymnfBnHG99/exec"; 
 
 /**
  * 將租客資料同步傳送至 Google Sheet
