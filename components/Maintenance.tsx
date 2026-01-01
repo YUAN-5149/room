@@ -13,23 +13,25 @@ interface MaintenanceProps {
   onUpdateTicket: (ticket: MaintenanceTicket) => void;
   onDeleteTicket: (id: string) => void;
   onBatchUpdateTicketStatus: (ids: string[], status: MaintenanceStatus) => void;
+  onUpdateFilter: (filter: FilterSchedule) => void; // New prop
 }
 
 const Maintenance: React.FC<MaintenanceProps> = ({ 
   tickets, 
-  filters: initialFilters, 
+  filters, 
   tenants,
   onUpdateTicketStatus,
   onAddTicket,
   onUpdateTicket,
   onDeleteTicket,
-  onBatchUpdateTicketStatus
+  onBatchUpdateTicketStatus,
+  onUpdateFilter
 }) => {
   const [activeTab, setActiveTab] = useState<'REPAIR' | 'FILTER'>('REPAIR');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
   
-  const [localFilters, setLocalFilters] = useState<FilterSchedule[]>(initialFilters);
+  // Removed localFilters state, using props 'filters' directly
   const [selectedTicketIds, setSelectedTicketIds] = useState<string[]>([]);
 
   // --- Filtering & Sorting State ---
@@ -52,7 +54,7 @@ const Maintenance: React.FC<MaintenanceProps> = ({
   const [formData, setFormData] = useState<Partial<MaintenanceTicket>>(initialFormState);
 
   const exportReport = () => {
-    const data = activeTab === 'REPAIR' ? tickets : localFilters;
+    const data = activeTab === 'REPAIR' ? tickets : filters;
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, activeTab === 'REPAIR' ? "Repairs" : "Filters");
@@ -79,18 +81,17 @@ const Maintenance: React.FC<MaintenanceProps> = ({
   };
 
   const handleDateChange = (id: string, newDate: string) => {
-    setLocalFilters(prev => prev.map(f => {
-      if (f.id === id) {
-        const nextDue = addMonths(newDate, f.cycleMonths);
-        return {
-          ...f,
-          lastReplaced: newDate,
-          nextDue: nextDue,
-          status: calculateStatus(nextDue)
+    const filter = filters.find(f => f.id === id);
+    if (filter) {
+        const nextDue = addMonths(newDate, filter.cycleMonths);
+        const updatedFilter = {
+            ...filter,
+            lastReplaced: newDate,
+            nextDue: nextDue,
+            status: calculateStatus(nextDue)
         };
-      }
-      return f;
-    }));
+        onUpdateFilter(updatedFilter);
+    }
   };
 
   const handleMarkReplaced = (id: string) => {
@@ -536,7 +537,7 @@ const Maintenance: React.FC<MaintenanceProps> = ({
                </tr>
              </thead>
              <tbody className="bg-white divide-y divide-stone-100">
-               {localFilters.map(filter => (
+               {filters.map(filter => (
                  <tr key={filter.id} className={`${getModelBgColor(filter.model)} transition duration-200`}>
                    <td className="px-6 py-4">
                      <div className="text-sm font-bold text-stone-800">{filter.model}</div>

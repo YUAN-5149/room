@@ -12,8 +12,13 @@ import Login from './components/Login';
 
 import { mockPayments, mockTenants, mockTickets, mockFilters, mockExpenses } from './services/mockData';
 import { verifyUser, User } from './services/authMock';
-import { PaymentRecord, PaymentStatus, MaintenanceTicket, MaintenanceStatus, Tenant, ExpenseRecord } from './types';
-import { syncTenantToSheet, fetchTenantsFromSheet, syncExpenseToSheet, fetchExpensesFromSheet } from './services/googleSheetService';
+import { PaymentRecord, PaymentStatus, MaintenanceTicket, MaintenanceStatus, Tenant, ExpenseRecord, FilterSchedule } from './types';
+import { 
+  syncTenantToSheet, fetchTenantsFromSheet, 
+  syncExpenseToSheet, fetchExpensesFromSheet,
+  syncPaymentToSheet, fetchPaymentsFromSheet,
+  syncMaintenanceToSheet, fetchMaintenanceFromSheet
+} from './services/googleSheetService';
 
 // Sidebar Navigation Component
 const Sidebar = ({ 
@@ -100,6 +105,11 @@ const App: React.FC = () => {
     return saved !== null ? JSON.parse(saved) : mockTickets;
   });
 
+  const [filters, setFilters] = useState<FilterSchedule[]>(() => {
+    const saved = localStorage.getItem('sl_filters');
+    return saved !== null ? JSON.parse(saved) : mockFilters;
+  });
+
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => {
     const saved = localStorage.getItem('sl_expenses');
     return saved !== null ? JSON.parse(saved) : mockExpenses;
@@ -108,17 +118,29 @@ const App: React.FC = () => {
   // Load from Google Sheets on mount
   useEffect(() => {
     const loadFromCloud = async () => {
-      // Load Tenants
+      // 1. Tenants
       const cloudTenants = await fetchTenantsFromSheet();
-      if (cloudTenants && cloudTenants.length > 0) {
-        setTenants(cloudTenants);
-      }
+      if (cloudTenants && cloudTenants.length > 0) setTenants(cloudTenants);
       
-      // Load Expenses
+      // 2. Expenses
       const cloudExpenses = await fetchExpensesFromSheet();
-      if (cloudExpenses && cloudExpenses.length > 0) {
-        console.log("Loaded expenses from Google Sheet");
-        setExpenses(cloudExpenses);
+      if (cloudExpenses && cloudExpenses.length > 0) setExpenses(cloudExpenses);
+
+      // 3. Payments
+      const cloudPayments = await fetchPaymentsFromSheet();
+      if (cloudPayments && cloudPayments.length > 0) setPayments(cloudPayments);
+
+      // 4. Maintenance (Repairs & Filters)
+      const cloudMaintenance = await fetchMaintenanceFromSheet();
+      if (cloudMaintenance) {
+          if (cloudMaintenance.repairs.length > 0) {
+              console.log("Loaded repairs from Google Sheet");
+              setTickets(cloudMaintenance.repairs);
+          }
+          if (cloudMaintenance.filters.length > 0) {
+              console.log("Loaded filters from Google Sheet");
+              setFilters(cloudMaintenance.filters);
+          }
       }
     };
     loadFromCloud();
@@ -128,6 +150,7 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('sl_payments', JSON.stringify(payments)); }, [payments]);
   useEffect(() => { localStorage.setItem('sl_tickets', JSON.stringify(tickets)); }, [tickets]);
   useEffect(() => { localStorage.setItem('sl_expenses', JSON.stringify(expenses)); }, [expenses]);
+  useEffect(() => { localStorage.setItem('sl_filters', JSON.stringify(filters)); }, [filters]);
 
   const handleLogin = (phone: string) => {
     const verifiedUser = verifyUser(phone);
@@ -137,21 +160,35 @@ const App: React.FC = () => {
 
   const handleUpdatePayment = (id: string, updates: Partial<PaymentRecord>) => {
     setPayments(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    syncPaymentToSheet('UPDATE', { id, ...updates });
   };
 
   const handleDeletePayment = (id: string) => {
     setPayments(prev => prev.filter(p => p.id !== id));
+    syncPaymentToSheet('DELETE', { id });
   };
 
   const handleAddPayments = (newPayments: PaymentRecord[]) => {
     setPayments(prev => [...newPayments, ...prev]);
+    newPayments.forEach(p => syncPaymentToSheet('CREATE', p));
   };
 
   const handleDeleteTenant = (id: string) => {
     if (window.confirm('確定要刪除這位租客資料？此操作將永久移除其所有財務紀錄與報修單。')) {
       setTenants(prev => prev.filter(t => t.id !== id));
-      setPayments(prev => prev.filter(p => p.tenantId !== id));
-      setTickets(prev => prev.filter(t => t.tenantId !== id));
+      
+      setPayments(prev => {
+        const toDelete = prev.filter(p => p.tenantId === id);
+        toDelete.forEach(p => syncPaymentToSheet('DELETE', { id: p.id }));
+        return prev.filter(p => p.tenantId !== id);
+      });
+
+      setTickets(prev => {
+          const toDelete = prev.filter(t => t.tenantId === id);
+          toDelete.forEach(t => syncMaintenanceToSheet('DELETE', 'REPAIR', { id: t.id }));
+          return prev.filter(t => t.tenantId !== id);
+      });
+      
       syncTenantToSheet('DELETE', { id });
     }
   };
@@ -188,12 +225,14 @@ const App: React.FC = () => {
     }
     if (newPayments.length > 0) {
       setPayments(prev => [...newPayments, ...prev]);
+      newPayments.forEach(p => syncPaymentToSheet('CREATE', p));
     }
   };
 
   const handleUpdateTenant = (updatedTenant: Tenant) => {
     setTenants(prev => prev.map(t => t.id === updatedTenant.id ? updatedTenant : t));
     syncTenantToSheet('UPDATE', updatedTenant);
+    
     setPayments(prev => prev.map(p => p.tenantId === updatedTenant.id ? { 
       ...p, 
       tenantName: updatedTenant.name,
@@ -201,19 +240,47 @@ const App: React.FC = () => {
     } : p));
   };
 
+  // --- Maintenance Handlers ---
+
+  const handleAddTicket = (ticket: MaintenanceTicket) => {
+      setTickets(prev => [ticket, ...prev]);
+      syncMaintenanceToSheet('CREATE', 'REPAIR', ticket);
+  };
+
+  const handleUpdateTicket = (updatedTicket: MaintenanceTicket) => {
+      setTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+      syncMaintenanceToSheet('UPDATE', 'REPAIR', updatedTicket);
+  };
+
+  const handleDeleteTicket = (id: string) => {
+      setTickets(prev => prev.filter(t => t.id !== id));
+      syncMaintenanceToSheet('DELETE', 'REPAIR', { id });
+  };
+
+  const handleUpdateTicketStatus = (id: string, status: MaintenanceStatus) => {
+      setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+      syncMaintenanceToSheet('UPDATE', 'REPAIR', { id, status });
+  };
+
   const handleBatchUpdateTicketsStatus = (ids: string[], status: MaintenanceStatus) => {
     setTickets(prev => prev.map(t => ids.includes(t.id) ? { ...t, status } : t));
+    ids.forEach(id => syncMaintenanceToSheet('UPDATE', 'REPAIR', { id, status }));
+  };
+
+  // Filter Updates
+  const handleUpdateFilter = (updatedFilter: FilterSchedule) => {
+      setFilters(prev => prev.map(f => f.id === updatedFilter.id ? updatedFilter : f));
+      syncMaintenanceToSheet('UPDATE', 'FILTER', updatedFilter);
+      // 如果濾心列表是新建的，可能需要 'CREATE' 邏輯，但目前 Mock Data 都是預設好的，這裡主要處理 'UPDATE'
   };
 
   const handleAddExpense = (newExpense: ExpenseRecord) => {
     setExpenses(prev => [newExpense, ...prev]);
-    // Sync to Google Sheet
     syncExpenseToSheet('CREATE', newExpense);
   };
 
   const handleDeleteExpense = (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
-    // Sync to Google Sheet
     syncExpenseToSheet('DELETE', { id });
   };
 
@@ -259,13 +326,14 @@ const App: React.FC = () => {
               <Route path="/maintenance" element={
                 <Maintenance 
                   tickets={tickets} 
-                  filters={mockFilters} 
+                  filters={filters} 
                   tenants={tenants} 
-                  onAddTicket={(t) => setTickets(prev => [t, ...prev])} 
-                  onUpdateTicket={(ut) => setTickets(prev => prev.map(t => t.id === ut.id ? ut : t))} 
-                  onDeleteTicket={(id) => setTickets(prev => prev.filter(t => t.id !== id))} 
-                  onUpdateTicketStatus={(id, s) => setTickets(prev => prev.map(t => t.id === id ? { ...t, status: s } : t))}
+                  onAddTicket={handleAddTicket} 
+                  onUpdateTicket={handleUpdateTicket} 
+                  onDeleteTicket={handleDeleteTicket} 
+                  onUpdateTicketStatus={handleUpdateTicketStatus}
                   onBatchUpdateTicketStatus={handleBatchUpdateTicketsStatus}
+                  onUpdateFilter={handleUpdateFilter}
                 />
               } />
             </Routes>
