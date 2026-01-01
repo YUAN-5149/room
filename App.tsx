@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, DollarSign, FileText, Wrench, Menu, X, LogOut, Receipt } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 import Dashboard from './components/Dashboard';
 import Financials from './components/Financials';
@@ -340,6 +341,7 @@ const App: React.FC = () => {
           </main>
         </div>
       </div>
+      <Analytics />
     </HashRouter>
   );
 };
