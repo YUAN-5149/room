@@ -2,10 +2,13 @@
 import { Tenant } from '../types';
 
 // ============================================================================
-// 重要：請將此處替換為您 Google Apps Script 部署後的「網頁應用程式網址」
-// IMPORTANT: Replace this URL with your deployed Google Apps Script Web App URL
+// 設定說明：
+// 1. 您提供的 Google Sheet ID 為: 1ILclS7FuqTZ_997n7GkJYNvF9OibFinJY7dSY8Rv1yA
+// 2. 請務必先在 Apps Script 部署為「網頁應用程式 (Web App)」。
+// 3. 將部署後取得的網址 (以 /exec 結尾) 貼在下方引號中。
+//    (請勿直接貼上 Google Sheet 的網址，那樣無法運作)
 // ============================================================================
-export const GOOGLE_SCRIPT_URL = "https://docs.google.com/spreadsheets/d/1ILclS7FuqTZ_997n7GkJYNvF9OibFinJY7dSY8Rv1yA/edit?gid=0#gid=0"; 
+export const GOOGLE_SCRIPT_URL = ""; 
 
 /**
  * 將租客資料同步傳送至 Google Sheet
@@ -13,7 +16,7 @@ export const GOOGLE_SCRIPT_URL = "https://docs.google.com/spreadsheets/d/1ILclS7
  */
 export const syncTenantToSheet = async (action: 'CREATE' | 'UPDATE' | 'DELETE', tenant: Partial<Tenant>) => {
   if (!GOOGLE_SCRIPT_URL) {
-    console.warn("Google Sheet Script URL尚未設定，僅儲存於本地。");
+    console.warn("Google Sheet Script URL 尚未設定，資料僅儲存於本地瀏覽器。請至 services/googleSheetService.ts 設定。");
     return;
   }
 
