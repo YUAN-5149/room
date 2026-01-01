@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { PaymentRecord, PaymentStatus, Tenant } from '../types';
@@ -96,11 +97,11 @@ const Financials: React.FC<FinancialsProps> = ({ payments, tenants, onUpdatePaym
 
   return (
     <div className="space-y-6 relative">
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-lg shadow-sm border-b-2 border-orange-100">
-        <h2 className="text-2xl font-bold text-stone-800 mb-4 sm:mb-0">財務管理</h2>
-        <div className="flex gap-2">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-white p-4 rounded-lg shadow-sm border-b-2 border-orange-100 gap-4">
+        <h2 className="text-2xl font-bold text-stone-800">財務管理</h2>
+        <div className="flex flex-wrap gap-2 w-full xl:w-auto">
           <select 
-            className="border border-stone-300 rounded-md px-3 py-2 text-sm text-stone-700 bg-white"
+            className="border border-stone-300 rounded-md px-3 py-2 text-sm text-stone-700 bg-white flex-grow xl:flex-grow-0"
             value={filter}
             onChange={(e) => setFilter(e.target.value as PaymentStatus | 'ALL')}
           >
@@ -111,156 +112,162 @@ const Financials: React.FC<FinancialsProps> = ({ payments, tenants, onUpdatePaym
           </select>
           <button 
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-md text-sm transition shadow-sm"
+            className="flex-grow xl:flex-grow-0 flex items-center justify-center gap-2 bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-md text-sm transition shadow-sm whitespace-nowrap"
           >
-            <Plus size={16} /> 新增帳單
+            <Plus size={16} /> <span className="hidden sm:inline">新增帳單</span><span className="sm:hidden">新增</span>
           </button>
           <button 
             onClick={handleExportExcel}
-            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-md text-sm transition shadow-sm"
+            className="flex-grow xl:flex-grow-0 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-md text-sm transition shadow-sm whitespace-nowrap"
           >
             <FileSpreadsheet size={16} /> 匯出
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-orange-100">
-          <thead className="bg-orange-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">房號</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">租客</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">金額</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">繳費日</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">狀態</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider">操作</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-orange-50">
-            {filteredPayments.map((payment) => {
-              const tenant = getTenantInfo(payment.tenantId);
-              return (
-                <tr key={payment.id} className="hover:bg-orange-50 transition">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-stone-700 flex items-center gap-2">
-                    <Home size={16} className="text-amber-400" />
-                    {tenant.roomNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-800">
-                    {payment.tenantName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm text-stone-800 font-semibold">${payment.amount.toLocaleString()}</span>
-                      <div className="flex gap-1">
-                        {getTypeBadge(payment.type)}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2 group">
-                        <Calendar size={14} className="text-stone-900 group-hover:text-amber-600 transition-colors" />
-                        <input 
-                          type="date"
-                          value={payment.dueDate}
-                          onChange={(e) => onUpdatePayment(payment.id, { dueDate: e.target.value })}
-                          className="text-sm bg-transparent border-b border-dashed border-stone-300 hover:border-amber-500 hover:text-amber-700 focus:border-amber-600 focus:ring-0 outline-none px-1 py-0.5 text-stone-800 font-medium transition cursor-pointer"
-                        />
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                        value={payment.status}
-                        onChange={(e) => onUpdatePayment(payment.id, { status: e.target.value as PaymentStatus })}
-                        className={`text-sm font-semibold py-1 px-3 rounded-full border cursor-pointer outline-none transition appearance-none ${getStatusColor(payment.status)}`}
-                    >
-                        <option value={PaymentStatus.PENDING}>待繳</option>
-                        <option value={PaymentStatus.PAID}>已繳</option>
-                        <option value={PaymentStatus.OVERDUE}>逾期</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-400">
-                      <button onClick={() => setDeleteTargetId(payment.id)} className="hover:text-rose-600 transition p-2">
-                        <Trash2 size={18} />
-                      </button>
-                  </td>
+      <div className="bg-white rounded-lg shadow overflow-hidden border border-stone-200">
+        <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-orange-100">
+            <thead className="bg-orange-50">
+                <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider whitespace-nowrap">房號</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider whitespace-nowrap">租客</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider whitespace-nowrap">金額</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider whitespace-nowrap">繳費日</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider whitespace-nowrap">狀態</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-amber-900 uppercase tracking-wider whitespace-nowrap">操作</th>
                 </tr>
-              );
-            })}
-            {filteredPayments.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-stone-400 italic">無帳單資料</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-orange-50">
+                {filteredPayments.map((payment) => {
+                const tenant = getTenantInfo(payment.tenantId);
+                return (
+                    <tr key={payment.id} className="hover:bg-orange-50 transition">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-stone-700">
+                        <div className="flex items-center gap-2">
+                            <Home size={16} className="text-amber-400" />
+                            {tenant.roomNumber}
+                        </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-800">
+                        {payment.tenantName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                        <span className="text-sm text-stone-800 font-semibold">${payment.amount.toLocaleString()}</span>
+                        <div className="flex gap-1">
+                            {getTypeBadge(payment.type)}
+                        </div>
+                        </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2 group">
+                            <Calendar size={14} className="text-stone-900 group-hover:text-amber-600 transition-colors" />
+                            <input 
+                            type="date"
+                            value={payment.dueDate}
+                            onChange={(e) => onUpdatePayment(payment.id, { dueDate: e.target.value })}
+                            className="text-sm bg-transparent border-b border-dashed border-stone-300 hover:border-amber-500 hover:text-amber-700 focus:border-amber-600 focus:ring-0 outline-none px-1 py-0.5 text-stone-800 font-medium transition cursor-pointer"
+                            />
+                        </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                        <select
+                            value={payment.status}
+                            onChange={(e) => onUpdatePayment(payment.id, { status: e.target.value as PaymentStatus })}
+                            className={`text-sm font-semibold py-1 px-3 rounded-full border cursor-pointer outline-none transition appearance-none ${getStatusColor(payment.status)}`}
+                        >
+                            <option value={PaymentStatus.PENDING}>待繳</option>
+                            <option value={PaymentStatus.PAID}>已繳</option>
+                            <option value={PaymentStatus.OVERDUE}>逾期</option>
+                        </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-400">
+                        <button onClick={() => setDeleteTargetId(payment.id)} className="hover:text-rose-600 transition p-2">
+                            <Trash2 size={18} />
+                        </button>
+                    </td>
+                    </tr>
+                );
+                })}
+                {filteredPayments.length === 0 && (
+                <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-stone-400 italic">無帳單資料</td>
+                </tr>
+                )}
+            </tbody>
+            </table>
+        </div>
       </div>
 
       {/* Add Payment Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-orange-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-orange-50 shrink-0">
               <h3 className="text-lg font-bold text-stone-800">新增繳費帳單</h3>
               <button onClick={() => setIsAddModalOpen(false)} className="text-stone-400 hover:text-stone-600"><X size={20} /></button>
             </div>
-            <form onSubmit={handleAddPayment} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-stone-700 mb-1">選擇租客</label>
-                <select 
-                  className="w-full border border-stone-300 rounded-lg p-2 text-sm"
-                  value={newPayment.tenantId}
-                  onChange={(e) => setNewPayment({...newPayment, tenantId: e.target.value})}
-                  required
-                >
-                  <option value="">請選擇租客...</option>
-                  {tenants.map(t => (
-                    <option key={t.id} value={t.id}>{t.name} ({t.roomNumber})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="p-6 overflow-y-auto">
+                <form onSubmit={handleAddPayment} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-stone-700 mb-1">帳單類別</label>
-                  <select 
-                    className="w-full border border-stone-300 rounded-lg p-2 text-sm"
-                    value={newPayment.type}
-                    onChange={(e) => setNewPayment({...newPayment, type: e.target.value as any})}
-                  >
-                    <option value="Rent">租金</option>
-                    <option value="Utility">水電</option>
-                    <option value="Deposit">押金</option>
-                    <option value="Other">其他</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-stone-700 mb-1">帳單金額</label>
-                  <input 
-                    type="number" 
-                    className="w-full border border-stone-300 rounded-lg p-2 text-sm"
-                    value={newPayment.amount}
-                    onChange={(e) => setNewPayment({...newPayment, amount: Number(e.target.value)})}
+                    <label className="block text-sm font-bold text-stone-700 mb-1">選擇租客</label>
+                    <select 
+                    className="w-full border border-stone-300 rounded-lg p-2 text-sm bg-white"
+                    value={newPayment.tenantId}
+                    onChange={(e) => setNewPayment({...newPayment, tenantId: e.target.value})}
                     required
-                  />
+                    >
+                    <option value="">請選擇租客...</option>
+                    {tenants.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.roomNumber})</option>
+                    ))}
+                    </select>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-stone-700 mb-1">繳費日</label>
-                <div className="relative">
-                    <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-900 pointer-events-none" />
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                    <label className="block text-sm font-bold text-stone-700 mb-1">帳單類別</label>
+                    <select 
+                        className="w-full border border-stone-300 rounded-lg p-2 text-sm bg-white"
+                        value={newPayment.type}
+                        onChange={(e) => setNewPayment({...newPayment, type: e.target.value as any})}
+                    >
+                        <option value="Rent">租金</option>
+                        <option value="Utility">水電</option>
+                        <option value="Deposit">押金</option>
+                        <option value="Other">其他</option>
+                    </select>
+                    </div>
+                    <div>
+                    <label className="block text-sm font-bold text-stone-700 mb-1">帳單金額</label>
                     <input 
-                      type="date" 
-                      className="w-full border border-stone-300 rounded-lg pl-10 pr-2 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none"
-                      value={newPayment.dueDate}
-                      onChange={(e) => setNewPayment({...newPayment, dueDate: e.target.value})}
-                      required
+                        type="number" 
+                        className="w-full border border-stone-300 rounded-lg p-2 text-sm"
+                        value={newPayment.amount}
+                        onChange={(e) => setNewPayment({...newPayment, amount: Number(e.target.value)})}
+                        required
                     />
+                    </div>
                 </div>
-              </div>
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 bg-stone-100 py-2 rounded-lg text-sm font-bold text-stone-600">取消</button>
-                <button type="submit" className="flex-1 bg-amber-600 py-2 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2"><Save size={16}/> 建立帳單</button>
-              </div>
-            </form>
+                <div>
+                    <label className="block text-sm font-bold text-stone-700 mb-1">繳費日</label>
+                    <div className="relative">
+                        <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-900 pointer-events-none" />
+                        <input 
+                        type="date" 
+                        className="w-full border border-stone-300 rounded-lg pl-10 pr-2 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                        value={newPayment.dueDate}
+                        onChange={(e) => setNewPayment({...newPayment, dueDate: e.target.value})}
+                        required
+                        />
+                    </div>
+                </div>
+                <div className="pt-4 flex gap-3">
+                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 bg-stone-100 py-2 rounded-lg text-sm font-bold text-stone-600">取消</button>
+                    <button type="submit" className="flex-1 bg-amber-600 py-2 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2"><Save size={16}/> 建立帳單</button>
+                </div>
+                </form>
+            </div>
           </div>
         </div>
       )}

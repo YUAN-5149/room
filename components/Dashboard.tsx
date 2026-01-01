@@ -55,10 +55,10 @@ const Dashboard: React.FC<DashboardProps> = ({ payments, expenses }) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       {/* Header & Year Selector */}
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-lg shadow-sm border-b-2 border-orange-100">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 rounded-lg shadow-sm border-b-2 border-orange-100 gap-4">
         <h2 className="text-2xl font-bold text-stone-800">營運總覽看板</h2>
         
-        <div className="flex items-center bg-white border border-stone-300 rounded-md p-0.5 shadow-sm mt-4 sm:mt-0">
+        <div className="flex items-center bg-white border border-stone-300 rounded-md p-0.5 shadow-sm w-full sm:w-auto justify-center">
              <button 
                onClick={() => changeYear(-1)}
                className="p-1.5 hover:bg-stone-100 rounded text-stone-500 hover:text-stone-800 transition"

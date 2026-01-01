@@ -129,8 +129,8 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
 
   return (
     <div className="space-y-6 h-full flex flex-col">
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-stone-200">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-stone-200 gap-4">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="bg-amber-100 p-2.5 rounded-lg text-amber-600">
                 <ScrollText size={20} />
             </div>
@@ -139,18 +139,19 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
                 <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Official Contract Engine</p>
             </div>
         </div>
-        <div className="flex gap-2">
-            <button onClick={handleExportTenants} className="flex items-center gap-2 px-5 py-2 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-lg text-xs font-bold transition-all shadow-sm">
-                <FileSpreadsheet size={14} /> 匯出名單
+        <div className="flex gap-2 w-full sm:w-auto">
+            <button onClick={handleExportTenants} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-lg text-xs font-bold transition-all shadow-sm whitespace-nowrap">
+                <FileSpreadsheet size={14} /> <span className="hidden sm:inline">匯出名單</span><span className="sm:hidden">匯出</span>
             </button>
-            <button onClick={() => { setMode('ADD'); setSelectedTenantId(null); }} className="flex items-center gap-2 px-5 py-2 bg-stone-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-lg hover:shadow-xl active:scale-95">
-                <Plus size={14} /> 新增租客
+            <button onClick={() => { setMode('ADD'); setSelectedTenantId(null); }} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 bg-stone-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-lg hover:shadow-xl active:scale-95 whitespace-nowrap">
+                <Plus size={14} /> <span className="hidden sm:inline">新增租客</span><span className="sm:hidden">新增</span>
             </button>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-        <div className="lg:w-72 flex-shrink-0 bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden flex flex-col">
+        {/* List Panel - Keep a min-height on mobile so it doesn't collapse */}
+        <div className={`lg:w-72 flex-shrink-0 bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden flex flex-col transition-all duration-300 ${(!selectedTenantId && mode !== 'ADD') ? 'h-96 lg:h-auto' : 'h-48 lg:h-auto'}`}>
           <div className="p-4 bg-stone-50 border-b border-stone-200">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={12} />
@@ -184,11 +185,11 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
           </div>
         </div>
 
-        <div className="flex-1 bg-white rounded-xl flex flex-col overflow-hidden border border-stone-200 shadow-sm">
+        <div className="flex-1 bg-white rounded-xl flex flex-col overflow-hidden border border-stone-200 shadow-sm min-h-0">
           {(selectedTenantId || mode === 'ADD') ? (
             <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
               {(mode === 'EDIT_INFO' || mode === 'ADD') && (
-                <div className="w-full md:w-80 bg-stone-50 border-r border-stone-200 flex flex-col p-6 space-y-5 overflow-y-auto custom-scrollbar">
+                <div className="w-full md:w-80 bg-stone-50 border-r border-stone-200 flex flex-col p-6 space-y-5 overflow-y-auto custom-scrollbar flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <h4 className="text-sm font-bold text-stone-800">{mode === 'ADD' ? '填寫租賃資訊' : '編輯租客資料'}</h4>
                         <button onClick={() => setMode('VIEW')} className="text-stone-400 hover:text-stone-600"><X size={18}/></button>
@@ -258,7 +259,7 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-8 bg-stone-50/50 flex flex-col items-center custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 space-y-8 bg-stone-50/50 flex flex-col items-center custom-scrollbar">
                 {mode === 'VIEW' && selectedTenant && (
                   <div className="w-full max-w-2xl space-y-8">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -271,8 +272,8 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
                             <Home size={14} className="text-amber-500" /> {selectedTenant.roomNumber} 號室 • 租約執行中
                         </p>
                       </div>
-                      <div className="flex gap-2.5">
-                        <button onClick={() => setMode('EDIT_INFO')} className="flex items-center gap-2 px-4 py-2 bg-white border border-stone-200 rounded-lg text-[11px] font-bold text-stone-600 hover:bg-stone-50 hover:border-amber-200 transition-all shadow-sm">
+                      <div className="flex gap-2.5 w-full sm:w-auto">
+                        <button onClick={() => setMode('EDIT_INFO')} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white border border-stone-200 rounded-lg text-[11px] font-bold text-stone-600 hover:bg-stone-50 hover:border-amber-200 transition-all shadow-sm whitespace-nowrap">
                             <Edit size={14} /> 編輯合約
                         </button>
                         <button onClick={() => { if(window.confirm('確定要刪除這位租客？相關帳務將一併清除。')) onDeleteTenant(selectedTenant.id); }} className="p-2 bg-rose-50 border border-rose-100 rounded-lg text-rose-500 hover:bg-rose-100 transition-all shadow-sm">
@@ -312,21 +313,21 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
                         </div>
                     </div>
 
-                    {/* Paper Contract Component */}
-                    <div className="w-full bg-[#fdfcf8] rounded-md p-12 font-serif text-stone-900 leading-[1.8] text-base border border-stone-200 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)] relative overflow-hidden animate-in fade-in zoom-in-95 duration-700">
+                    {/* Paper Contract Component - Adjusted padding for mobile */}
+                    <div className="w-full bg-[#fdfcf8] rounded-md p-6 md:p-12 font-serif text-stone-900 leading-[1.8] text-base border border-stone-200 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)] relative overflow-hidden animate-in fade-in zoom-in-95 duration-700">
                        <div className="absolute top-0 left-0 w-full h-1 bg-amber-600/20"></div>
-                       <div className="flex justify-between items-center mb-10 border-b-2 border-stone-900 pb-4">
-                          <h1 className="text-2xl font-black tracking-[0.3em] uppercase">住宅租賃契約書</h1>
+                       <div className="flex justify-between items-center mb-6 md:mb-10 border-b-2 border-stone-900 pb-4">
+                          <h1 className="text-xl md:text-2xl font-black tracking-[0.3em] uppercase">住宅租賃契約書</h1>
                           <Printer size={18} className="text-stone-300 hover:text-stone-900 cursor-pointer transition-colors" />
                        </div>
                        
                        <div className="space-y-8 tracking-tight">
-                           <pre className="whitespace-pre-wrap font-serif text-[15px] leading-relaxed text-stone-800">
+                           <pre className="whitespace-pre-wrap font-serif text-[13px] md:text-[15px] leading-relaxed text-stone-800">
                                 {renderContractText(selectedTenant)}
                            </pre>
                        </div>
                        
-                       <div className="mt-16 pt-8 border-t border-stone-100 flex justify-between items-center opacity-40">
+                       <div className="mt-10 md:mt-16 pt-8 border-t border-stone-100 flex justify-between items-center opacity-40">
                           <div className="text-[10px] font-bold tracking-widest">LANDLORD OFFICE INTERNAL USE ONLY</div>
                           <div className="text-[10px] font-bold">PAGE 01 / 01</div>
                        </div>
