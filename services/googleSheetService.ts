@@ -1,27 +1,48 @@
 
-import { Tenant } from '../types';
+import { Tenant, ExpenseRecord, ExpenseCategory } from '../types';
 
 // ============================================================================
-// 設定說明：
-// 1. 您提供的 Google Sheet ID 為: 1ILclS7FuqTZ_997n7GkJYNvF9OibFinJY7dSY8Rv1yA
-// 2. 請務必先在 Apps Script 部署為「網頁應用程式 (Web App)」。
-// 3. 將部署後取得的網址 (以 /exec 結尾) 貼在下方引號中。
-//    (請勿直接貼上 Google Sheet 的網址，那樣無法運作)
+// 設定 1: 租客管理 Sheet (既有)
 // ============================================================================
 export const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwczxcccdrvLXT26Ly_wi_l9lRFXDV2UPCEPW2XPfN1TV821-14PiewT7ymnfBnHG99/exec"; 
 
+// ============================================================================
+// 設定 2: 費用管理 Sheet (新增)
+// Sheet ID: 1moxMBNGHAV7e91lT7o5ABgLe4YZVvWo9DhTZNzecjUM
+// 請填入您剛剛部署 Expenses Script 後取得的網址 (以 /exec 結尾)
+// ============================================================================
+export const GOOGLE_SCRIPT_EXPENSES_URL = "https://script.google.com/macros/s/AKfycbymaG_U9W_lUjwmn5N7YeQ0fS5RlHCneG8pjK8b8bCkwkfMpsUwcG08tlU-j8WFRUmI/exec"; 
+
+
+/**
+ * 類別中英轉換對照表
+ */
+const CATEGORY_MAP_TO_ZH: Record<ExpenseCategory, string> = {
+  'Water': '自來水費',
+  'Electricity': '電費',
+  'Gas': '瓦斯費',
+  'Internet': '網路費',
+  'Cleaning': '清潔費',
+  'Other': '雜支'
+};
+
+const CATEGORY_MAP_TO_EN: Record<string, ExpenseCategory> = {
+  '自來水費': 'Water',
+  '電費': 'Electricity',
+  '瓦斯費': 'Gas',
+  '網路費': 'Internet',
+  '清潔費': 'Cleaning',
+  '雜支': 'Other'
+};
+
+
 /**
  * 將租客資料同步傳送至 Google Sheet
- * 注意：由於 CORS 限制，這裡使用 mode: 'no-cors'，我們無法讀取回應，但資料會成功送達後端。
  */
 export const syncTenantToSheet = async (action: 'CREATE' | 'UPDATE' | 'DELETE', tenant: Partial<Tenant>) => {
-  if (!GOOGLE_SCRIPT_URL) {
-    console.warn("Google Sheet Script URL 尚未設定，資料僅儲存於本地瀏覽器。請至 services/googleSheetService.ts 設定。");
-    return;
-  }
+  if (!GOOGLE_SCRIPT_URL) return;
 
   try {
-    // 準備要傳送的 payload
     const payload = {
       action: action,
       data: {
@@ -36,40 +57,28 @@ export const syncTenantToSheet = async (action: 'CREATE' | 'UPDATE' | 'DELETE', 
       }
     };
 
-    // 使用 fetch 發送 POST 請求
     await fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
-      mode: 'no-cors', // 避開跨域問題 (Opaque response)
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
-    console.log(`Successfully sent ${action} request to Google Sheet for ${tenant.name}`);
-
   } catch (error) {
-    console.error("Failed to sync to Google Sheet:", error);
-    // 即使失敗也不阻擋前端操作，確保用戶體驗流暢
+    console.error("Failed to sync tenant to Google Sheet:", error);
   }
 };
 
-/**
- * 從 Google Sheet 讀取資料 (如果已設定)
- */
 export const fetchTenantsFromSheet = async (): Promise<Tenant[] | null> => {
     if (!GOOGLE_SCRIPT_URL) return null;
-
     try {
         const response = await fetch(GOOGLE_SCRIPT_URL);
         const data = await response.json();
-        // 簡單轉換，確保符合 Tenant 介面
         return Array.isArray(data) ? data.map((row: any) => ({
             id: row.id || `t-${Math.random()}`,
             name: row.name || '',
             roomNumber: row.roomNumber || '',
             phone: row.phone || '',
-            email: '', // Sheet 範例中未包含，設為空
+            email: '', 
             moveInDate: row.moveInDate || '',
             leaseEndDate: row.leaseEndDate || '',
             rentAmount: Number(row.rentAmount) || 0,
@@ -78,7 +87,68 @@ export const fetchTenantsFromSheet = async (): Promise<Tenant[] | null> => {
             contractContent: ''
         })) : null;
     } catch (e) {
-        console.error("Fetch sheet error", e);
+        console.error("Fetch tenant sheet error", e);
         return null;
     }
 }
+
+/**
+ * 將費用資料同步至 Google Sheet (Expenses)
+ */
+export const syncExpenseToSheet = async (action: 'CREATE' | 'DELETE', expense: Partial<ExpenseRecord>) => {
+  if (!GOOGLE_SCRIPT_EXPENSES_URL) {
+    console.warn("Expense Sheet URL 尚未設定");
+    return;
+  }
+
+  try {
+    // 轉換類別為中文再傳送
+    const categoryZH = expense.category ? CATEGORY_MAP_TO_ZH[expense.category] : '雜支';
+
+    const payload = {
+      action: action,
+      data: {
+        id: expense.id,
+        category: categoryZH,
+        amount: expense.amount,
+        date: expense.date,
+        description: expense.description
+      }
+    };
+
+    await fetch(GOOGLE_SCRIPT_EXPENSES_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    console.log(`Synced expense ${action} to sheet`);
+  } catch (error) {
+    console.error("Failed to sync expense:", error);
+  }
+};
+
+/**
+ * 從 Google Sheet 讀取費用資料
+ */
+export const fetchExpensesFromSheet = async (): Promise<ExpenseRecord[] | null> => {
+  if (!GOOGLE_SCRIPT_EXPENSES_URL) return null;
+
+  try {
+    const response = await fetch(GOOGLE_SCRIPT_EXPENSES_URL);
+    const data = await response.json();
+    
+    // 將中文類別轉回英文 Enum
+    return Array.isArray(data) ? data.map((row: any) => ({
+      id: row.id || `exp-${Math.random()}`,
+      category: CATEGORY_MAP_TO_EN[row.category] || 'Other',
+      amount: Number(row.amount) || 0,
+      date: row.date || '',
+      description: row.description || ''
+    })) : null;
+
+  } catch (e) {
+    console.error("Fetch expense sheet error", e);
+    return null;
+  }
+};

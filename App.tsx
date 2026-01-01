@@ -13,7 +13,7 @@ import Login from './components/Login';
 import { mockPayments, mockTenants, mockTickets, mockFilters, mockExpenses } from './services/mockData';
 import { verifyUser, User } from './services/authMock';
 import { PaymentRecord, PaymentStatus, MaintenanceTicket, MaintenanceStatus, Tenant, ExpenseRecord } from './types';
-import { syncTenantToSheet, fetchTenantsFromSheet } from './services/googleSheetService';
+import { syncTenantToSheet, fetchTenantsFromSheet, syncExpenseToSheet, fetchExpensesFromSheet } from './services/googleSheetService';
 
 // Sidebar Navigation Component
 const Sidebar = ({ 
@@ -105,14 +105,20 @@ const App: React.FC = () => {
     return saved !== null ? JSON.parse(saved) : mockExpenses;
   });
 
-  // Attempt to load from Google Sheets on mount (optional sync)
+  // Load from Google Sheets on mount
   useEffect(() => {
     const loadFromCloud = async () => {
-      const cloudData = await fetchTenantsFromSheet();
-      if (cloudData && cloudData.length > 0) {
-        console.log("Loaded tenants from Google Sheet");
-        // Optional: Merge strategy or overwrite. Here we overwrite if cloud has data.
-        setTenants(cloudData);
+      // Load Tenants
+      const cloudTenants = await fetchTenantsFromSheet();
+      if (cloudTenants && cloudTenants.length > 0) {
+        setTenants(cloudTenants);
+      }
+      
+      // Load Expenses
+      const cloudExpenses = await fetchExpensesFromSheet();
+      if (cloudExpenses && cloudExpenses.length > 0) {
+        console.log("Loaded expenses from Google Sheet");
+        setExpenses(cloudExpenses);
       }
     };
     loadFromCloud();
@@ -146,7 +152,6 @@ const App: React.FC = () => {
       setTenants(prev => prev.filter(t => t.id !== id));
       setPayments(prev => prev.filter(p => p.tenantId !== id));
       setTickets(prev => prev.filter(t => t.tenantId !== id));
-      // Sync Delete to Sheet (Not fully implemented in GAS example, but hook is here)
       syncTenantToSheet('DELETE', { id });
     }
   };
@@ -155,10 +160,7 @@ const App: React.FC = () => {
     const tenantId = newTenant.id || `t-${Date.now()}`;
     const tenantWithId = { ...newTenant, id: tenantId };
     
-    // 1. Update Local State (Immediate Feedback)
     setTenants(prev => [...prev, tenantWithId]);
-    
-    // 2. Sync to Google Sheet (Background)
     syncTenantToSheet('CREATE', tenantWithId);
     
     const newPayments: PaymentRecord[] = [];
@@ -191,10 +193,7 @@ const App: React.FC = () => {
 
   const handleUpdateTenant = (updatedTenant: Tenant) => {
     setTenants(prev => prev.map(t => t.id === updatedTenant.id ? updatedTenant : t));
-    
-    // Sync Update
     syncTenantToSheet('UPDATE', updatedTenant);
-
     setPayments(prev => prev.map(p => p.tenantId === updatedTenant.id ? { 
       ...p, 
       tenantName: updatedTenant.name,
@@ -208,10 +207,14 @@ const App: React.FC = () => {
 
   const handleAddExpense = (newExpense: ExpenseRecord) => {
     setExpenses(prev => [newExpense, ...prev]);
+    // Sync to Google Sheet
+    syncExpenseToSheet('CREATE', newExpense);
   };
 
   const handleDeleteExpense = (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
+    // Sync to Google Sheet
+    syncExpenseToSheet('DELETE', { id });
   };
 
   if (!user) return <Login onLogin={handleLogin} error={loginError} />;
