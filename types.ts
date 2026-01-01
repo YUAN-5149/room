@@ -1,3 +1,4 @@
+
 export enum PaymentStatus {
   PAID = '已繳',
   PENDING = '待繳',
@@ -14,6 +15,16 @@ export enum Priority {
   LOW = '低',
   MEDIUM = '中',
   HIGH = '高',
+}
+
+export type ExpenseCategory = 'Water' | 'Electricity' | 'Gas' | 'Internet' | 'Cleaning' | 'Other';
+
+export interface ExpenseRecord {
+  id: string;
+  category: ExpenseCategory;
+  amount: number;
+  date: string; // YYYY-MM-DD
+  description?: string;
 }
 
 export interface Tenant {

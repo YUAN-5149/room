@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { MaintenanceTicket, FilterSchedule, MaintenanceStatus, Priority, Tenant } from '../types';
-import { Wrench, CheckCircle, AlertTriangle, Plus, Edit, Trash2, X, Save, RefreshCw, Calendar, User, ClipboardList } from 'lucide-react';
+import { Wrench, CheckCircle, AlertTriangle, Plus, Edit, Trash2, X, Save, RefreshCw, Calendar, User, ClipboardList, CheckSquare, Square, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface MaintenanceProps {
@@ -11,6 +12,7 @@ interface MaintenanceProps {
   onAddTicket: (ticket: MaintenanceTicket) => void;
   onUpdateTicket: (ticket: MaintenanceTicket) => void;
   onDeleteTicket: (id: string) => void;
+  onBatchUpdateTicketStatus: (ids: string[], status: MaintenanceStatus) => void;
 }
 
 const Maintenance: React.FC<MaintenanceProps> = ({ 
@@ -20,13 +22,21 @@ const Maintenance: React.FC<MaintenanceProps> = ({
   onUpdateTicketStatus,
   onAddTicket,
   onUpdateTicket,
-  onDeleteTicket
+  onDeleteTicket,
+  onBatchUpdateTicketStatus
 }) => {
   const [activeTab, setActiveTab] = useState<'REPAIR' | 'FILTER'>('REPAIR');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
   
   const [localFilters, setLocalFilters] = useState<FilterSchedule[]>(initialFilters);
+  const [selectedTicketIds, setSelectedTicketIds] = useState<string[]>([]);
+
+  // --- Filtering & Sorting State ---
+  const [filterStatus, setFilterStatus] = useState<'ALL' | MaintenanceStatus>('ALL');
+  const [filterPriority, setFilterPriority] = useState<'ALL' | Priority>('ALL');
+  const [filterCategory, setFilterCategory] = useState<string>('ALL');
+  const [sortConfig, setSortConfig] = useState<{ key: 'date' | 'priority' | 'cost'; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
 
   // Form State for Repairs
   const initialFormState: Partial<MaintenanceTicket> = {
@@ -143,6 +153,7 @@ const Maintenance: React.FC<MaintenanceProps> = ({
   const handleDelete = (id: string) => {
       if (window.confirm('確定要刪除此維修紀錄嗎？')) {
           onDeleteTicket(id);
+          setSelectedTicketIds(prev => prev.filter(sid => sid !== id));
       }
   };
 
@@ -179,6 +190,82 @@ const Maintenance: React.FC<MaintenanceProps> = ({
         'Other': '其他'
     };
     return mapping[cat] || cat;
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTicketIds.length === filteredAndSortedTickets.length && filteredAndSortedTickets.length > 0) {
+      setSelectedTicketIds([]);
+    } else {
+      setSelectedTicketIds(filteredAndSortedTickets.map(t => t.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedTicketIds(prev => 
+      prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
+    );
+  };
+
+  const handleBatchStatusUpdate = (status: MaintenanceStatus) => {
+    if (selectedTicketIds.length === 0) return;
+    onBatchUpdateTicketStatus(selectedTicketIds, status);
+    setSelectedTicketIds([]);
+  };
+
+  // --- Sorting & Filtering Logic ---
+  const handleSort = (key: 'date' | 'priority' | 'cost') => {
+    setSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'desc' ? 'asc' : 'desc'
+    }));
+  };
+
+  const getPriorityWeight = (p: Priority) => {
+    if (p === Priority.HIGH) return 3;
+    if (p === Priority.MEDIUM) return 2;
+    return 1;
+  };
+
+  const filteredAndSortedTickets = useMemo(() => {
+    let result = [...tickets];
+
+    // 1. Filter
+    if (filterStatus !== 'ALL') {
+      result = result.filter(t => t.status === filterStatus);
+    }
+    if (filterPriority !== 'ALL') {
+      result = result.filter(t => t.priority === filterPriority);
+    }
+    if (filterCategory !== 'ALL') {
+      result = result.filter(t => t.category === filterCategory);
+    }
+
+    // 2. Sort
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortConfig.key) {
+        case 'date':
+          comparison = new Date(a.reportDate).getTime() - new Date(b.reportDate).getTime();
+          break;
+        case 'cost':
+          comparison = (a.cost || 0) - (b.cost || 0);
+          break;
+        case 'priority':
+          comparison = getPriorityWeight(a.priority) - getPriorityWeight(b.priority);
+          break;
+      }
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [tickets, filterStatus, filterPriority, filterCategory, sortConfig]);
+
+
+  const SortIcon = ({ colKey }: { colKey: string }) => {
+    if (sortConfig.key !== colKey) return <ArrowUpDown size={14} className="text-stone-300 ml-1 inline" />;
+    return sortConfig.direction === 'asc' ? 
+      <ArrowUp size={14} className="text-amber-600 ml-1 inline" /> : 
+      <ArrowDown size={14} className="text-amber-600 ml-1 inline" />;
   };
 
   return (
@@ -220,99 +307,219 @@ const Maintenance: React.FC<MaintenanceProps> = ({
       </div>
 
       {activeTab === 'REPAIR' ? (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-orange-100">
-             <thead className="bg-stone-100">
-               <tr>
-                 <th className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider">日期 / 類別</th>
-                 <th className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider">租客</th>
-                 <th className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider">問題描述</th>
-                 <th className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider">優先級 (可改)</th>
-                 <th className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider">費用</th>
-                 <th className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider">處理狀態 (可改)</th>
-                 <th className="px-6 py-3 text-right text-xs font-bold text-stone-600 uppercase tracking-wider">操作</th>
-               </tr>
-             </thead>
-             <tbody className="bg-white divide-y divide-stone-100">
-               {tickets.map(ticket => (
-                 <tr key={ticket.id} className="hover:bg-orange-50/30 transition duration-150">
-                   <td className="px-6 py-4 whitespace-nowrap">
-                     <div className="text-sm font-medium text-stone-900">{ticket.reportDate}</div>
-                     <div className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded inline-block mt-1 font-bold">
-                        {translateCategory(ticket.category)}
-                     </div>
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap">
-                     <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center text-amber-700 text-xs font-bold">
-                            {ticket.tenantName.charAt(0)}
-                        </div>
-                        <span className="text-sm text-stone-700 font-medium">{ticket.tenantName}</span>
-                     </div>
-                   </td>
-                   <td className="px-6 py-4">
-                     <p className="text-sm text-stone-800 line-clamp-1 max-w-xs" title={ticket.description}>
-                        {ticket.description}
-                     </p>
-                     {ticket.notes && <p className="text-[10px] text-stone-400 mt-0.5 italic">附註: {ticket.notes}</p>}
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap">
-                      <select 
-                        value={ticket.priority}
-                        onChange={(e) => handleInlinePriorityUpdate(ticket.id, e.target.value as Priority)}
-                        className={`text-xs bg-transparent border-none focus:ring-0 cursor-pointer p-0 pr-6 ${getPriorityStyle(ticket.priority)}`}
-                      >
-                        <option value={Priority.LOW}>低級</option>
-                        <option value={Priority.MEDIUM}>普通</option>
-                        <option value={Priority.HIGH}>緊急</option>
-                      </select>
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-700 font-semibold">
-                      ${(ticket.cost || 0).toLocaleString()}
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap">
-                      <select 
-                        value={ticket.status}
-                        onChange={(e) => onUpdateTicketStatus(ticket.id, e.target.value as MaintenanceStatus)}
-                        className={`text-xs font-bold py-1 px-3 rounded-full border cursor-pointer outline-none transition appearance-none shadow-sm ${getStatusStyle(ticket.status)}`}
-                      >
-                        <option value={MaintenanceStatus.OPEN}>待處理</option>
-                        <option value={MaintenanceStatus.IN_PROGRESS}>維修中</option>
-                        <option value={MaintenanceStatus.COMPLETED}>已完成</option>
-                      </select>
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="flex justify-end gap-2">
-                        <button 
-                            onClick={() => handleOpenEditModal(ticket)}
-                            className="text-stone-400 hover:text-amber-600 transition p-1.5 rounded-full hover:bg-amber-50"
-                            title="完整編輯"
-                        >
-                            <Edit size={16} />
-                        </button>
-                        <button 
-                            onClick={() => handleDelete(ticket.id)}
-                            className="text-stone-400 hover:text-rose-600 transition p-1.5 rounded-full hover:bg-rose-50"
-                            title="刪除"
-                        >
-                            <Trash2 size={16} />
-                        </button>
+        <div className="space-y-4">
+          
+          {/* Filter Bar */}
+          <div className="bg-white p-3 rounded-lg border border-stone-200 flex flex-wrap gap-4 items-center shadow-sm">
+             <div className="flex items-center gap-2 text-stone-500 text-sm font-bold">
+                <Filter size={16} /> 篩選:
+             </div>
+             
+             <select 
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className="bg-stone-50 border border-stone-200 text-stone-700 text-xs rounded-md px-2 py-1.5 outline-none focus:ring-1 focus:ring-amber-500"
+             >
+                <option value="ALL">全部狀態</option>
+                <option value={MaintenanceStatus.OPEN}>待處理</option>
+                <option value={MaintenanceStatus.IN_PROGRESS}>維修中</option>
+                <option value={MaintenanceStatus.COMPLETED}>已完成</option>
+             </select>
+
+             <select 
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value as any)}
+                className="bg-stone-50 border border-stone-200 text-stone-700 text-xs rounded-md px-2 py-1.5 outline-none focus:ring-1 focus:ring-amber-500"
+             >
+                <option value="ALL">全部優先級</option>
+                <option value={Priority.HIGH}>緊急 (High)</option>
+                <option value={Priority.MEDIUM}>普通 (Medium)</option>
+                <option value={Priority.LOW}>低 (Low)</option>
+             </select>
+
+             <select 
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="bg-stone-50 border border-stone-200 text-stone-700 text-xs rounded-md px-2 py-1.5 outline-none focus:ring-1 focus:ring-amber-500"
+             >
+                <option value="ALL">全部類別</option>
+                <option value="Appliance">家電</option>
+                <option value="Plumbing">水電管路</option>
+                <option value="Electrical">電力系統</option>
+                <option value="Filter">濾心耗材</option>
+                <option value="Other">其他</option>
+             </select>
+             
+             {(filterStatus !== 'ALL' || filterPriority !== 'ALL' || filterCategory !== 'ALL') && (
+               <button 
+                  onClick={() => { setFilterStatus('ALL'); setFilterPriority('ALL'); setFilterCategory('ALL'); }}
+                  className="text-xs text-rose-500 hover:text-rose-700 font-bold ml-auto"
+               >
+                 清除篩選
+               </button>
+             )}
+          </div>
+
+          {selectedTicketIds.length > 0 && (
+            <div className="bg-stone-800 text-white p-3 rounded-lg flex items-center justify-between animate-in slide-in-from-top-2 duration-300 shadow-lg">
+              <div className="flex items-center gap-4">
+                <div className="text-sm font-bold flex items-center gap-2">
+                  <CheckSquare size={16} className="text-amber-500" />
+                  已選取 {selectedTicketIds.length} 項紀錄
+                </div>
+                <div className="h-4 w-px bg-stone-600"></div>
+                <div className="text-xs font-medium text-stone-400">批次標記狀態：</div>
+                <div className="flex gap-2">
+                   <button 
+                    onClick={() => handleBatchStatusUpdate(MaintenanceStatus.COMPLETED)}
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-xs font-bold transition flex items-center gap-1.5"
+                   >
+                     <CheckCircle size={14} /> 已完成
+                   </button>
+                   <button 
+                    onClick={() => handleBatchStatusUpdate(MaintenanceStatus.IN_PROGRESS)}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs font-bold transition flex items-center gap-1.5"
+                   >
+                     <RefreshCw size={14} /> 維修中
+                   </button>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedTicketIds([])}
+                className="text-stone-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <table className="min-w-full divide-y divide-orange-100">
+              <thead className="bg-stone-100">
+                <tr>
+                  <th className="px-6 py-3 text-left w-10">
+                    <button onClick={toggleSelectAll} className="text-stone-400 hover:text-amber-600 transition">
+                      {selectedTicketIds.length === filteredAndSortedTickets.length && filteredAndSortedTickets.length > 0 ? (
+                        <CheckSquare size={18} className="text-amber-600" />
+                      ) : (
+                        <Square size={18} />
+                      )}
+                    </button>
+                  </th>
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider cursor-pointer hover:bg-stone-200 transition select-none group"
+                    onClick={() => handleSort('date')}
+                  >
+                    日期 / 類別 <SortIcon colKey="date" />
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider">租客</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider">問題描述</th>
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider cursor-pointer hover:bg-stone-200 transition select-none group"
+                    onClick={() => handleSort('priority')}
+                  >
+                    優先級 (可改) <SortIcon colKey="priority" />
+                  </th>
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider cursor-pointer hover:bg-stone-200 transition select-none group"
+                    onClick={() => handleSort('cost')}
+                  >
+                    費用 <SortIcon colKey="cost" />
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-stone-600 uppercase tracking-wider">處理狀態 (可改)</th>
+                  <th className="px-6 py-3 text-right text-xs font-bold text-stone-600 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-stone-100">
+                {filteredAndSortedTickets.map(ticket => (
+                  <tr key={ticket.id} className={`${selectedTicketIds.includes(ticket.id) ? 'bg-amber-50/50' : 'hover:bg-orange-50/30'} transition duration-150`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button onClick={() => toggleSelectOne(ticket.id)} className="text-stone-400 hover:text-amber-600 transition">
+                        {selectedTicketIds.includes(ticket.id) ? (
+                          <CheckSquare size={18} className="text-amber-600" />
+                        ) : (
+                          <Square size={18} />
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-stone-900">{ticket.reportDate}</div>
+                      <div className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded inline-block mt-1 font-bold">
+                          {translateCategory(ticket.category)}
                       </div>
-                   </td>
-                 </tr>
-               ))}
-               {tickets.length === 0 && (
-                   <tr>
-                       <td colSpan={7} className="px-6 py-12 text-center text-stone-400 italic">
-                           目前沒有報修紀錄。
-                       </td>
-                   </tr>
-               )}
-             </tbody>
-          </table>
-          <div className="p-4 bg-stone-50 flex items-center gap-2 text-[11px] text-stone-500">
-            <ClipboardList size={12} className="text-amber-500" />
-            <span>提示：您可以直接在表格中點擊「優先級」或「處理狀態」進行快速標記更動。</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center text-amber-700 text-xs font-bold">
+                              {ticket.tenantName.charAt(0)}
+                          </div>
+                          <span className="text-sm text-stone-700 font-medium">{ticket.tenantName}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-stone-800 line-clamp-1 max-w-xs" title={ticket.description}>
+                          {ticket.description}
+                      </p>
+                      {ticket.notes && <p className="text-[10px] text-stone-400 mt-0.5 italic">附註: {ticket.notes}</p>}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                        <select 
+                          value={ticket.priority}
+                          onChange={(e) => handleInlinePriorityUpdate(ticket.id, e.target.value as Priority)}
+                          className={`text-xs bg-transparent border-none focus:ring-0 cursor-pointer p-0 pr-6 ${getPriorityStyle(ticket.priority)}`}
+                        >
+                          <option value={Priority.LOW}>低級</option>
+                          <option value={Priority.MEDIUM}>普通</option>
+                          <option value={Priority.HIGH}>緊急</option>
+                        </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-700 font-semibold">
+                        ${(ticket.cost || 0).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                        <select 
+                          value={ticket.status}
+                          onChange={(e) => onUpdateTicketStatus(ticket.id, e.target.value as MaintenanceStatus)}
+                          className={`text-xs font-bold py-1 px-3 rounded-full border cursor-pointer outline-none transition appearance-none shadow-sm ${getStatusStyle(ticket.status)}`}
+                        >
+                          <option value={MaintenanceStatus.OPEN}>待處理</option>
+                          <option value={MaintenanceStatus.IN_PROGRESS}>維修中</option>
+                          <option value={MaintenanceStatus.COMPLETED}>已完成</option>
+                        </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <div className="flex justify-end gap-2">
+                          <button 
+                              onClick={() => handleOpenEditModal(ticket)}
+                              className="text-stone-400 hover:text-amber-600 transition p-1.5 rounded-full hover:bg-amber-50"
+                              title="完整編輯"
+                          >
+                              <Edit size={16} />
+                          </button>
+                          <button 
+                              onClick={() => handleDelete(ticket.id)}
+                              className="text-stone-400 hover:text-rose-600 transition p-1.5 rounded-full hover:bg-rose-50"
+                              title="刪除"
+                          >
+                              <Trash2 size={16} />
+                          </button>
+                        </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredAndSortedTickets.length === 0 && (
+                    <tr>
+                        <td colSpan={8} className="px-6 py-12 text-center text-stone-400 italic">
+                            目前沒有符合條件的報修紀錄。
+                        </td>
+                    </tr>
+                )}
+              </tbody>
+            </table>
+            <div className="p-4 bg-stone-50 flex items-center gap-2 text-[11px] text-stone-500">
+              <ClipboardList size={12} className="text-amber-500" />
+              <span>提示：點擊表格標題（日期、優先級、費用）可進行排序。勾選方塊可進行批次狀態更新。</span>
+            </div>
           </div>
         </div>
       ) : (
