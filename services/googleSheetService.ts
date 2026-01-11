@@ -26,7 +26,7 @@ export const GOOGLE_SCRIPT_MAINTENANCE_URL = "https://script.google.com/macros/s
 // 對應試算表: https://docs.google.com/spreadsheets/d/1b8mzxeuzyQskMIdXrLcFBH5P37mKUnMKIiZW0TB_mO4/edit?gid=0#gid=0
 // 請將該試算表部署 Apps Script 後取得的 /exec 網址填入下方
 // ============================================================================
-export const GOOGLE_SCRIPT_FILTER_URL = "https://script.google.com/macros/s/AKfycbzD48CCREG2Y6o5a1ET74o2Wt56CBftpbaSFex3m2xv3ymXNcoykfWwMeAkpp_NTc8Y/exec"; 
+export const GOOGLE_SCRIPT_FILTER_URL = "在此處填入您新部署的濾心 Script URL (以 /exec 結尾)"; 
 
 // ============================================================================
 // 設定 6: 電表管理 Sheet 
