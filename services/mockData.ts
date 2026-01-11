@@ -1,5 +1,5 @@
 
-import { Tenant, PaymentRecord, MaintenanceTicket, FilterSchedule, ExpenseRecord } from '../types';
+import { Tenant, PaymentRecord, MaintenanceTicket, FilterSchedule, ExpenseRecord, MeterReading } from '../types';
 
 export const mockTenants: Tenant[] = [];
 
@@ -8,6 +8,8 @@ export const mockPayments: PaymentRecord[] = [];
 export const mockTickets: MaintenanceTicket[] = [];
 
 export const mockExpenses: ExpenseRecord[] = [];
+
+export const mockReadings: MeterReading[] = [];
 
 export const mockFilters: FilterSchedule[] = [
   { 

@@ -1,23 +1,25 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, DollarSign, FileText, Wrench, Menu, X, LogOut, Receipt } from 'lucide-react';
+import { LayoutDashboard, DollarSign, FileText, Wrench, Menu, X, LogOut, Receipt, Zap } from 'lucide-react';
 
 import Dashboard from './components/Dashboard';
 import Financials from './components/Financials';
 import Contracts from './components/Contracts';
 import Maintenance from './components/Maintenance';
-import Expenses from './components/Expenses'; // New Component
+import Expenses from './components/Expenses';
+import Meters from './components/Meters'; // New Component
 import Login from './components/Login';
 
-import { mockPayments, mockTenants, mockTickets, mockFilters, mockExpenses } from './services/mockData';
+import { mockPayments, mockTenants, mockTickets, mockFilters, mockExpenses, mockReadings } from './services/mockData';
 import { verifyUser, User } from './services/authMock';
-import { PaymentRecord, PaymentStatus, MaintenanceTicket, MaintenanceStatus, Tenant, ExpenseRecord, FilterSchedule } from './types';
+import { PaymentRecord, PaymentStatus, MaintenanceTicket, MaintenanceStatus, Tenant, ExpenseRecord, FilterSchedule, MeterReading } from './types';
 import { 
   syncTenantToSheet, fetchTenantsFromSheet, 
   syncExpenseToSheet, fetchExpensesFromSheet,
   syncPaymentToSheet, fetchPaymentsFromSheet,
-  syncMaintenanceToSheet, fetchMaintenanceFromSheet
+  syncMaintenanceToSheet, fetchMaintenanceFromSheet,
+  syncMeterToSheet, fetchMetersFromSheet
 } from './services/googleSheetService';
 
 // Sidebar Navigation Component
@@ -39,6 +41,7 @@ const Sidebar = ({
     { path: '/expenses', label: '費用管理', icon: Receipt },
     { path: '/financials', label: '財務管理', icon: DollarSign },
     { path: '/maintenance', label: '維修管理', icon: Wrench },
+    { path: '/meters', label: '電表管理', icon: Zap },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -115,6 +118,11 @@ const App: React.FC = () => {
     return saved !== null ? JSON.parse(saved) : mockExpenses;
   });
 
+  const [meterReadings, setMeterReadings] = useState<MeterReading[]>(() => {
+    const saved = localStorage.getItem('sl_meters');
+    return saved !== null ? JSON.parse(saved) : mockReadings;
+  });
+
   // Load from Google Sheets on mount
   useEffect(() => {
     const loadFromCloud = async () => {
@@ -134,14 +142,16 @@ const App: React.FC = () => {
       const cloudMaintenance = await fetchMaintenanceFromSheet();
       if (cloudMaintenance) {
           if (cloudMaintenance.repairs.length > 0) {
-              console.log("Loaded repairs from Google Sheet");
               setTickets(cloudMaintenance.repairs);
           }
           if (cloudMaintenance.filters.length > 0) {
-              console.log("Loaded filters from Google Sheet");
               setFilters(cloudMaintenance.filters);
           }
       }
+
+      // 5. Meters
+      const cloudMeters = await fetchMetersFromSheet();
+      if (cloudMeters && cloudMeters.length > 0) setMeterReadings(cloudMeters);
     };
     loadFromCloud();
   }, []);
@@ -151,6 +161,7 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('sl_tickets', JSON.stringify(tickets)); }, [tickets]);
   useEffect(() => { localStorage.setItem('sl_expenses', JSON.stringify(expenses)); }, [expenses]);
   useEffect(() => { localStorage.setItem('sl_filters', JSON.stringify(filters)); }, [filters]);
+  useEffect(() => { localStorage.setItem('sl_meters', JSON.stringify(meterReadings)); }, [meterReadings]);
 
   const handleLogin = (phone: string) => {
     const verifiedUser = verifyUser(phone);
@@ -271,7 +282,6 @@ const App: React.FC = () => {
   const handleUpdateFilter = (updatedFilter: FilterSchedule) => {
       setFilters(prev => prev.map(f => f.id === updatedFilter.id ? updatedFilter : f));
       syncMaintenanceToSheet('UPDATE', 'FILTER', updatedFilter);
-      // 如果濾心列表是新建的，可能需要 'CREATE' 邏輯，但目前 Mock Data 都是預設好的，這裡主要處理 'UPDATE'
   };
 
   const handleAddExpense = (newExpense: ExpenseRecord) => {
@@ -282,6 +292,23 @@ const App: React.FC = () => {
   const handleDeleteExpense = (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
     syncExpenseToSheet('DELETE', { id });
+  };
+
+  // Meters Handlers
+  const handleAddReading = (reading: MeterReading) => {
+    setMeterReadings(prev => [reading, ...prev]);
+    syncMeterToSheet('CREATE', reading);
+  };
+
+  const handleDeleteReading = (id: string) => {
+    console.log("App: processing delete reading for:", id); // Debug Log
+    // 強制轉型 string 確保比對正確
+    setMeterReadings(prev => {
+        const afterDelete = prev.filter(r => String(r.id) !== String(id));
+        console.log("App: remaining count:", afterDelete.length);
+        return afterDelete;
+    });
+    syncMeterToSheet('DELETE', { id });
   };
 
   if (!user) return <Login onLogin={handleLogin} error={loginError} />;
@@ -312,6 +339,13 @@ const App: React.FC = () => {
                     expenses={expenses}
                     onAddExpense={handleAddExpense}
                     onDeleteExpense={handleDeleteExpense}
+                 />
+              } />
+              <Route path="/meters" element={
+                 <Meters 
+                    readings={meterReadings}
+                    onAddReading={handleAddReading}
+                    onDeleteReading={handleDeleteReading}
                  />
               } />
               <Route path="/contracts" element={

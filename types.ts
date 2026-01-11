@@ -75,3 +75,15 @@ export interface FilterSchedule {
   nextDue: string;
   status: 'Good' | 'Due Soon' | 'Overdue';
 }
+
+export interface MeterReading {
+  id: string;
+  meterName: string; // e.g. "3F A室" or "Meter #3"
+  date: string;      // YYYY-MM-DD
+  currentReading: number;
+  previousReading: number;
+  usage: number;     // current - previous
+  ratePerKwh: number;
+  totalCost: number;
+  note?: string;
+}

@@ -1,10 +1,8 @@
 
-import { Tenant, ExpenseRecord, ExpenseCategory, PaymentRecord, PaymentStatus, MaintenanceTicket, FilterSchedule, MaintenanceStatus, Priority } from '../types';
+import { Tenant, ExpenseRecord, ExpenseCategory, PaymentRecord, PaymentStatus, MaintenanceTicket, FilterSchedule, MaintenanceStatus, Priority, MeterReading } from '../types';
 
 // ============================================================================
 // 設定 1: 租客管理 Sheet
-// Sheet ID: 1ILclS7FuqTZ_997n7GkJYNvF9OibFinJY7dSY8Rv1yA
-// 請填入您剛剛部署 Tenants Script 後取得的網址 (以 /exec 結尾)
 // ============================================================================
 export const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw70J0EVv__jiy07J8awh997Wpr4gTC5P7CIGEJqx3LPc2LIZMlZLZvd9D2spOeDA/exec"; 
 
@@ -19,9 +17,21 @@ export const GOOGLE_SCRIPT_EXPENSES_URL = "https://script.google.com/macros/s/AK
 export const GOOGLE_SCRIPT_PAYMENTS_URL = "https://script.google.com/macros/s/AKfycbyvd6BkeKdwqMx8y-VJVop81256WORFxfpmbwB-UJg3qOEPDO5YFS6CIFZwZAdA_1fN2A/exec"; 
 
 // ============================================================================
-// 設定 4: 維修管理 Sheet
+// 設定 4: 維修管理 Sheet (僅包含報修單 Repairs)
 // ============================================================================
 export const GOOGLE_SCRIPT_MAINTENANCE_URL = "https://script.google.com/macros/s/AKfycbymi85ebX1JCDoGIXeq1qOLtruOAVyNCibQrD_wPigccpAzFQN1N-ReW-sOzu4TUP3oEA/exec"; 
+
+// ============================================================================
+// 設定 5: 飲水機濾心管理 Sheet (Filters) - NEW
+// 對應試算表: https://docs.google.com/spreadsheets/d/1b8mzxeuzyQskMIdXrLcFBH5P37mKUnMKIiZW0TB_mO4/edit?gid=0#gid=0
+// 請將該試算表部署 Apps Script 後取得的 /exec 網址填入下方
+// ============================================================================
+export const GOOGLE_SCRIPT_FILTER_URL = "https://script.google.com/macros/s/AKfycbzD48CCREG2Y6o5a1ET74o2Wt56CBftpbaSFex3m2xv3ymXNcoykfWwMeAkpp_NTc8Y/exec"; 
+
+// ============================================================================
+// 設定 6: 電表管理 Sheet 
+// ============================================================================
+export const GOOGLE_SCRIPT_METERS_URL = "https://script.google.com/macros/s/AKfycbwBqUhDImQQN1sIdSTv0rfXzUTJxvp9-9ya1dOQgHq8aIpNMofCR2a6JI1_gS4jqeNmLw/exec"; 
 
 
 /** 類別中英轉換 (費用) */
@@ -192,61 +202,118 @@ export const fetchPaymentsFromSheet = async (): Promise<PaymentRecord[] | null> 
   } catch (e) { return null; }
 };
 
-// --- Maintenance Sync ---
+// --- Maintenance Sync (Separated Logic for Repairs and Filters) ---
 
 export const syncMaintenanceToSheet = async (
   action: 'CREATE' | 'UPDATE' | 'DELETE', 
   type: 'REPAIR' | 'FILTER', 
   data: Partial<MaintenanceTicket> | Partial<FilterSchedule>
 ) => {
-  if (!GOOGLE_SCRIPT_MAINTENANCE_URL) return;
+  // 判斷類型，決定寫入哪一個 Script URL
+  const targetUrl = type === 'FILTER' ? GOOGLE_SCRIPT_FILTER_URL : GOOGLE_SCRIPT_MAINTENANCE_URL;
+
+  if (!targetUrl || targetUrl.includes("在此處填入")) {
+      console.warn("Script URL not configured for", type);
+      return;
+  }
+
   try {
     let finalData = { ...data };
     
-    // 轉換中文
+    // 如果是報修單，進行中文轉換
     if (type === 'REPAIR') {
       const ticket = data as Partial<MaintenanceTicket>;
       if(ticket.status) (finalData as any).status = MAINTENANCE_STATUS_TO_ZH[ticket.status];
       if(ticket.priority) (finalData as any).priority = PRIORITY_TO_ZH[ticket.priority];
       if(ticket.category) (finalData as any).category = MAINTENANCE_CAT_TO_ZH[ticket.category] || '其他';
     } 
+    // Filter 資料通常不需要額外轉換，直接傳送即可 (前端已處理好格式)
 
     const payload = { action, type, data: finalData };
-    await fetch(GOOGLE_SCRIPT_MAINTENANCE_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-  } catch (error) { console.error("Maintenance Sync Error", error); }
+    await fetch(targetUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  } catch (error) { console.error(`Maintenance Sync Error (${type})`, error); }
 };
 
 export const fetchMaintenanceFromSheet = async (): Promise<{ repairs: MaintenanceTicket[], filters: FilterSchedule[] } | null> => {
-  if (!GOOGLE_SCRIPT_MAINTENANCE_URL) return null;
-  try {
-    const response = await fetch(GOOGLE_SCRIPT_MAINTENANCE_URL);
-    const json = await response.json(); 
-    
-    const repairs = Array.isArray(json.repairs) ? json.repairs.map((row: any) => ({
-        id: row.id,
-        tenantId: row.tenantId,
-        tenantName: row.tenantName,
-        description: row.description,
-        reportDate: row.reportDate,
-        status: MAINTENANCE_STATUS_TO_EN[row.status] || MaintenanceStatus.OPEN,
-        priority: PRIORITY_TO_EN[row.priority] || Priority.MEDIUM,
-        category: MAINTENANCE_CAT_TO_EN[row.category] || 'Other',
-        cost: Number(row.cost) || 0,
-        notes: row.notes || ''
-    })) : [];
+  let repairs: MaintenanceTicket[] = [];
+  let filters: FilterSchedule[] = [];
 
-    const filters = Array.isArray(json.filters) ? json.filters.map((row: any) => ({
-        id: row.id,
-        model: row.model,
-        specification: row.specification,
-        cycleMonths: Number(row.cycleMonths),
-        location: row.location,
-        lastReplaced: row.lastReplaced,
-        nextDue: row.nextDue,
-        status: row.status as any
-    })) : [];
+  // 1. Fetch Repairs (Old URL)
+  if (GOOGLE_SCRIPT_MAINTENANCE_URL) {
+    try {
+      const response = await fetch(GOOGLE_SCRIPT_MAINTENANCE_URL);
+      const json = await response.json(); 
+      // 舊版 Script 可能同時回傳 { repairs: [], filters: [] }，我們只取 repairs
+      const rawRepairs = json.repairs || (Array.isArray(json) ? json : []); // 兼容不同回傳格式
 
-    return { repairs, filters };
+      if (Array.isArray(rawRepairs)) {
+        repairs = rawRepairs.map((row: any) => ({
+            id: row.id,
+            tenantId: row.tenantId,
+            tenantName: row.tenantName,
+            description: row.description,
+            reportDate: row.reportDate,
+            status: MAINTENANCE_STATUS_TO_EN[row.status] || MaintenanceStatus.OPEN,
+            priority: PRIORITY_TO_EN[row.priority] || Priority.MEDIUM,
+            category: MAINTENANCE_CAT_TO_EN[row.category] || 'Other',
+            cost: Number(row.cost) || 0,
+            notes: row.notes || ''
+        }));
+      }
+    } catch (e) { console.error("Fetch Repairs Failed", e); }
+  }
 
-  } catch (e) { return null; }
+  // 2. Fetch Filters (New URL)
+  if (GOOGLE_SCRIPT_FILTER_URL && !GOOGLE_SCRIPT_FILTER_URL.includes("在此處填入")) {
+    try {
+        const response = await fetch(GOOGLE_SCRIPT_FILTER_URL);
+        const json = await response.json();
+        // 假設新 Filter Script 直接回傳陣列，或是 { data: [] }
+        const rawFilters = Array.isArray(json) ? json : (json.data || []);
+        
+        if (Array.isArray(rawFilters)) {
+            filters = rawFilters.map((row: any) => ({
+                id: row.id,
+                model: row.model,
+                specification: row.specification,
+                cycleMonths: Number(row.cycleMonths),
+                location: row.location,
+                lastReplaced: row.lastReplaced,
+                nextDue: row.nextDue,
+                status: row.status as any
+            }));
+        }
+    } catch (e) { console.error("Fetch Filters Failed", e); }
+  }
+
+  return { repairs, filters };
 };
+
+// --- Meters Sync ---
+export const syncMeterToSheet = async (action: 'CREATE' | 'DELETE', reading: Partial<MeterReading>) => {
+  if (!GOOGLE_SCRIPT_METERS_URL) return;
+  try {
+    const payload = { action, data: reading };
+    await fetch(GOOGLE_SCRIPT_METERS_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  } catch (error) { console.error("Meter Sync Error", error); }
+};
+
+export const fetchMetersFromSheet = async (): Promise<MeterReading[] | null> => {
+    if (!GOOGLE_SCRIPT_METERS_URL) return null;
+    try {
+        const response = await fetch(GOOGLE_SCRIPT_METERS_URL);
+        const data = await response.json();
+        return Array.isArray(data) ? data.map((row: any) => ({
+            // If row.id is missing or empty, generate a temporary one to avoid React key collisions
+            id: row.id ? String(row.id) : `m-gen-${Math.random().toString(36).substr(2, 9)}`, 
+            meterName: row.meterName,
+            date: row.date,
+            currentReading: Number(row.currentReading),
+            previousReading: Number(row.previousReading),
+            usage: Number(row.usage),
+            ratePerKwh: Number(row.ratePerKwh),
+            totalCost: Number(row.totalCost),
+            note: row.note
+        })) : null;
+    } catch(e) { return null; }
+}
