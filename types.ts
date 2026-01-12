@@ -39,6 +39,7 @@ export interface Tenant {
   deposit: number;
   idNumber: string; // ID Card number
   contractContent?: string; // Custom contract clauses
+  fingerprintId?: string; // 指紋建置號碼
 }
 
 export interface PaymentRecord {

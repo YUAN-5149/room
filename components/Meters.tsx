@@ -12,7 +12,7 @@ interface MetersProps {
 
 const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null); // 用於控制刪除確認視窗
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
   // 預設表單狀態
@@ -25,10 +25,17 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
     note: ''
   });
 
-  // 取得所有不重複的電表名稱，用於下拉選單
+  // 取得所有不重複的電表名稱
   const uniqueMeters = useMemo(() => {
     const names = new Set(readings.map(r => r.meterName));
     return Array.from(names).sort();
+  }, [readings]);
+
+  // 動態計算平均費率
+  const dynamicAverageRate = useMemo(() => {
+    if (readings.length === 0) return 5.5; // 無資料時顯示預設 5.5
+    const totalRate = readings.reduce((acc, curr) => acc + (curr.ratePerKwh || 0), 0);
+    return (totalRate / readings.length).toFixed(1);
   }, [readings]);
 
   // 過濾顯示資料
@@ -42,7 +49,6 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
   // 當選擇電表名稱時，自動帶入上次讀數
   const handleMeterNameChange = (name: string) => {
     const meterReadings = readings.filter(r => r.meterName === name);
-    // 找出日期最近的一次
     const lastReading = meterReadings.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
     
     setFormData(prev => ({
@@ -83,7 +89,6 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
 
     onAddReading(newReading);
     setIsModalOpen(false);
-    // Reset but keep date and rate
     setFormData({
       ...formData,
       meterName: '',
@@ -113,7 +118,7 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
     }));
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "MeterReadings");
+    XLSX.utils.book_append_sheet(wb, ws, "電表抄表紀錄");
     XLSX.writeFile(wb, "Electricity_Report.xlsx");
   };
 
@@ -150,29 +155,28 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
         </div>
       </div>
 
-      {/* 數據卡片概覽 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100 flex items-center justify-between">
             <div>
                 <p className="text-xs text-stone-500 font-bold uppercase">本月總用電</p>
                 <p className="text-2xl font-black text-stone-800 mt-1">
-                    {readings.filter(r => r.date.startsWith(new Date().toISOString().slice(0, 7))).reduce((acc, r) => acc + r.usage, 0).toLocaleString()} <span className="text-sm font-medium text-stone-400">kWh</span>
+                    {readings.filter(r => r.date.startsWith(new Date().toISOString().slice(0, 7))).reduce((acc, r) => acc + r.usage, 0).toLocaleString()} <span className="text-sm font-medium text-stone-400">度</span>
                 </p>
             </div>
             <Zap size={32} className="text-yellow-400 opacity-50" />
         </div>
          <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100 flex items-center justify-between">
             <div>
-                <p className="text-xs text-stone-500 font-bold uppercase">平均費率</p>
+                <p className="text-xs text-stone-500 font-bold uppercase">平均計費單價</p>
                 <p className="text-2xl font-black text-stone-800 mt-1">
-                    $5.5 <span className="text-sm font-medium text-stone-400">/度</span>
+                    ${filteredReadings.length > 0 ? dynamicAverageRate : '5.5'} <span className="text-sm font-medium text-stone-400">/度</span>
                 </p>
             </div>
              <div className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-400 font-bold">$</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100 flex items-center justify-between">
             <div>
-                <p className="text-xs text-stone-500 font-bold uppercase">監控電表數</p>
+                <p className="text-xs text-stone-500 font-bold uppercase">已建檔電表</p>
                 <p className="text-2xl font-black text-stone-800 mt-1">
                     {uniqueMeters.length} <span className="text-sm font-medium text-stone-400">支</span>
                 </p>
@@ -213,7 +217,7 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">
-                                    {reading.usage} kWh
+                                    {reading.usage} 度
                                 </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-stone-800">
@@ -222,11 +226,7 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                                 <button 
                                     type="button"
-                                    onClick={(e) => { 
-                                        e.preventDefault(); 
-                                        e.stopPropagation(); 
-                                        setDeleteTargetId(reading.id);
-                                    }}
+                                    onClick={() => setDeleteTargetId(reading.id)}
                                     className="text-stone-400 hover:text-rose-500 transition p-2 rounded-full hover:bg-rose-50"
                                     title="刪除紀錄"
                                 >
@@ -245,7 +245,7 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
         </div>
       </div>
 
-      {/* Add Modal */}
+      {/* 新增視窗 */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm">
             <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
@@ -325,7 +325,7 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
                             </div>
                             <div className="flex justify-between items-center border-t border-stone-200 pt-3">
                                 <span className="text-sm font-bold text-stone-600">本期用電：</span>
-                                <span className="text-lg font-black text-amber-600">{calculateUsage()} kWh</span>
+                                <span className="text-lg font-black text-amber-600">{calculateUsage()} 度</span>
                             </div>
                              <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-stone-600">預估電費：</span>
@@ -352,16 +352,16 @@ const Meters: React.FC<MetersProps> = ({ readings, onAddReading, onDeleteReading
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* 刪除確認視窗 */}
       {deleteTargetId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full overflow-hidden">
+          <div className="bg-white rounded-xl shadow-xl max-sm w-full overflow-hidden">
             <div className="p-6 text-center">
               <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center mb-4 mx-auto text-rose-600">
                 <AlertTriangle size={24} />
               </div>
               <h3 className="text-xl font-bold text-stone-800 mb-2">確定刪除此紀錄?</h3>
-              <p className="text-stone-500 text-sm">此操作將從列表中移除，但您仍可在 Excel 匯出中查看舊資料(若已備份)。</p>
+              <p className="text-stone-500 text-sm">此操作將永久移除此筆抄表數據。</p>
             </div>
             <div className="flex border-t border-stone-100">
               <button 

@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant, PaymentRecord, PaymentStatus } from '../types';
-// Added Home to the imports from lucide-react
-import { FileText, Edit, Plus, Trash2, User, Save, X, ChevronRight, Search, Users, Zap, DollarSign, Clock, Printer, ScrollText, Home, FileSpreadsheet } from 'lucide-react';
+import { FileText, Edit, Plus, Trash2, User, Save, X, ChevronRight, Search, Users, Zap, DollarSign, Clock, Printer, ScrollText, Home, FileSpreadsheet, Fingerprint } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ContractsProps {
@@ -22,7 +21,7 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
   
   const initialFormState: Tenant = {
     id: '', name: '', roomNumber: '', phone: '', email: '', moveInDate: new Date().toISOString().split('T')[0],
-    leaseEndDate: '', rentAmount: 0, deposit: 0, idNumber: '', contractContent: '',
+    leaseEndDate: '', rentAmount: 0, deposit: 0, idNumber: '', contractContent: '', fingerprintId: '',
   };
 
   const [formData, setFormData] = useState<Tenant>(initialFormState);
@@ -41,7 +40,11 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
   }, [selectedTenant, mode]);
 
   const filteredTenants = useMemo(() => {
-    return tenants.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.roomNumber.toLowerCase().includes(searchQuery.toLowerCase()));
+    return tenants.filter(t => 
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      t.roomNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.fingerprintId && t.fingerprintId.includes(searchQuery))
+    );
   }, [tenants, searchQuery]);
 
   const getTenantFinancialStatus = (tenantId: string) => {
@@ -72,6 +75,7 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
       房號: t.roomNumber,
       姓名: t.name,
       電話: t.phone,
+      指紋建置號碼: t.fingerprintId || '',
       Email: t.email,
       身分證字號: t.idNumber,
       起租日期: t.moveInDate,
@@ -87,7 +91,6 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
     XLSX.writeFile(wb, "Tenant_List.xlsx");
   };
 
-  // 生成公版合約文字
   const renderContractText = (data: Tenant) => {
     const name = data.name || '________';
     const idNumber = data.idNumber || '________________';
@@ -126,6 +129,16 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
 
 --- 出租人（簽章）：________________    承租人（簽章）：________________`;
   };
+  
+  const downloadContract = () => {
+     if (!selectedTenant) return;
+     const element = document.createElement("a");
+     const file = new Blob([renderContractText(selectedTenant)], {type: 'text/plain'});
+     element.href = URL.createObjectURL(file);
+     element.download = `Contract_${selectedTenant.name}.txt`;
+     document.body.appendChild(element);
+     element.click();
+  };
 
   return (
     <div className="space-y-6 h-full flex flex-col">
@@ -136,7 +149,7 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
             </div>
             <div>
                 <h2 className="text-lg font-bold text-stone-800 tracking-tight">合約與租客管理</h2>
-                <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Official Contract Engine</p>
+                <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">智慧合約產生系統</p>
             </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -150,12 +163,12 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-        {/* List Panel - Keep a min-height on mobile so it doesn't collapse */}
+        {/* List Panel */}
         <div className={`lg:w-72 flex-shrink-0 bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden flex flex-col transition-all duration-300 ${(!selectedTenantId && mode !== 'ADD') ? 'h-96 lg:h-auto' : 'h-48 lg:h-auto'}`}>
           <div className="p-4 bg-stone-50 border-b border-stone-200">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={12} />
-              <input type="text" placeholder="搜尋租客、房號..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-stone-200 rounded-lg text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all" />
+              <input type="text" placeholder="搜尋租客、房號、指紋..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-stone-200 rounded-lg text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all" />
             </div>
           </div>
           <div className="overflow-y-auto flex-1 divide-y divide-stone-50">
@@ -172,192 +185,166 @@ const Contracts: React.FC<ContractsProps> = ({ tenants, payments, onAddTenant, o
                   </div>
                   <div className="flex justify-between items-center mt-1">
                     <p className="text-[10px] text-stone-400 font-bold ml-4 uppercase">{t.roomNumber} 室</p>
-                    <p className="text-[9px] font-medium text-stone-300 italic">{t.moveInDate.split('-')[0]} 年度</p>
+                    {t.fingerprintId && (
+                        <p className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1 rounded flex items-center gap-1">
+                            <Fingerprint size={8} /> #{t.fingerprintId}
+                        </p>
+                    )}
                   </div>
                 </div>
               );
             }) : (
-                <div className="p-8 text-center flex flex-col items-center">
-                    <Users size={32} className="text-stone-200 mb-2" />
-                    <p className="text-xs text-stone-400 font-medium">尚無租客資料</p>
+                <div className="p-8 text-center text-stone-400 text-xs">
+                    無符合租客
                 </div>
             )}
           </div>
         </div>
 
-        <div className="flex-1 bg-white rounded-xl flex flex-col overflow-hidden border border-stone-200 shadow-sm min-h-0">
-          {(selectedTenantId || mode === 'ADD') ? (
-            <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
-              {(mode === 'EDIT_INFO' || mode === 'ADD') && (
-                <div className="w-full md:w-80 bg-stone-50 border-r border-stone-200 flex flex-col p-6 space-y-5 overflow-y-auto custom-scrollbar flex-shrink-0">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-bold text-stone-800">{mode === 'ADD' ? '填寫租賃資訊' : '編輯租客資料'}</h4>
-                        <button onClick={() => setMode('VIEW')} className="text-stone-400 hover:text-stone-600"><X size={18}/></button>
-                    </div>
-                    
-                    <div className="space-y-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-tighter ml-1">租客全名</label>
-                            <input name="name" value={formData.name} onChange={handleInputChange} className="w-full p-2.5 text-xs border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500" placeholder="王小明" required />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-tighter ml-1">手機電話</label>
-                            <input name="phone" value={formData.phone} onChange={handleInputChange} className="w-full p-2.5 text-xs border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500" placeholder="09xx-xxx-xxx" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-tighter ml-1">房號</label>
-                                <input name="roomNumber" value={formData.roomNumber} onChange={handleInputChange} className="w-full p-2.5 text-xs border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500" placeholder="A101" required />
+        {/* Detail / Edit / Add Panel */}
+        <div className="flex-1 bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden flex flex-col min-h-[500px]">
+          {mode === 'ADD' || (mode === 'EDIT_INFO' && selectedTenant) ? (
+             <div className="flex flex-col h-full">
+                <div className="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-stone-50">
+                    <h3 className="text-sm font-bold text-stone-800 flex items-center gap-2">
+                        {mode === 'ADD' ? <><Plus size={16}/> 新增租客資料</> : <><Edit size={16}/> 編輯租客資料</>}
+                    </h3>
+                    <button onClick={() => setMode('VIEW')} className="text-stone-400 hover:text-stone-600"><X size={18} /></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6">
+                    <form onSubmit={handleSave} className="space-y-6 max-w-3xl mx-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-bold text-amber-600 uppercase tracking-wider border-b border-amber-100 pb-2 mb-4">基本資料</h4>
+                                <div><label className="block text-xs font-bold text-stone-500 mb-1">姓名</label><input required name="name" value={formData.name} onChange={handleInputChange} className="w-full border border-stone-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" /></div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><label className="block text-xs font-bold text-stone-500 mb-1">手機電話</label><input required name="phone" value={formData.phone} onChange={handleInputChange} className="w-full border border-stone-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" /></div>
+                                    <div><label className="block text-xs font-bold text-amber-600 mb-1 flex items-center gap-1"><Fingerprint size={12}/> 指紋建置號碼</label><input name="fingerprintId" value={formData.fingerprintId || ''} onChange={handleInputChange} className="w-full border border-amber-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none bg-amber-50/30" placeholder="編號" /></div>
+                                </div>
+                                <div><label className="block text-xs font-bold text-stone-500 mb-1">身分證字號</label><input name="idNumber" value={formData.idNumber} onChange={handleInputChange} className="w-full border border-stone-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" /></div>
+                                <div><label className="block text-xs font-bold text-stone-500 mb-1">電子郵件</label><input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full border border-stone-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" /></div>
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-tighter ml-1">身分證字號</label>
-                                <input name="idNumber" value={formData.idNumber} onChange={handleInputChange} className="w-full p-2.5 text-xs border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500" placeholder="A123456789" />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-tighter ml-1">月租金</label>
-                                <input type="number" name="rentAmount" value={formData.rentAmount} onChange={handleInputChange} className="w-full p-2.5 text-xs border border-stone-200 rounded-lg outline-none font-bold text-amber-600" />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-tighter ml-1">押金金額</label>
-                                <input type="number" name="deposit" value={formData.deposit} onChange={handleInputChange} className="w-full p-2.5 text-xs border border-stone-200 rounded-lg outline-none font-bold" />
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-bold text-amber-600 uppercase tracking-wider border-b border-amber-100 pb-2 mb-4">租賃資訊</h4>
+                                <div><label className="block text-xs font-bold text-stone-500 mb-1">房號</label><input required name="roomNumber" value={formData.roomNumber} onChange={handleInputChange} className="w-full border border-stone-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" /></div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><label className="block text-xs font-bold text-stone-500 mb-1">起租日期</label><input type="date" required name="moveInDate" value={formData.moveInDate} onChange={handleInputChange} className="w-full border border-stone-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" /></div>
+                                    <div><label className="block text-xs font-bold text-stone-500 mb-1">合約到期</label><input type="date" name="leaseEndDate" value={formData.leaseEndDate} onChange={handleInputChange} className="w-full border border-stone-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" /></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><label className="block text-xs font-bold text-stone-500 mb-1">每月租金</label><input type="number" required name="rentAmount" value={formData.rentAmount} onChange={handleInputChange} className="w-full border border-stone-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" /></div>
+                                    <div><label className="block text-xs font-bold text-stone-500 mb-1">押金金額</label><input type="number" required name="deposit" value={formData.deposit} onChange={handleInputChange} className="w-full border border-stone-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" /></div>
+                                </div>
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-tighter ml-1">起租日期</label>
-                                <input type="date" name="moveInDate" value={formData.moveInDate} onChange={handleInputChange} className="w-full p-2.5 text-xs border border-stone-200 rounded-lg outline-none" />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-tighter ml-1">租期屆滿</label>
-                                <input type="date" name="leaseEndDate" value={formData.leaseEndDate} onChange={handleInputChange} className="w-full p-2.5 text-xs border border-stone-200 rounded-lg outline-none" />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-tighter ml-1">特別約定 (禁菸/寵物/報稅等)</label>
-                            <textarea name="contractContent" value={formData.contractContent} onChange={handleInputChange} className="w-full p-2.5 text-xs border border-stone-200 rounded-lg outline-none h-20 resize-none" placeholder="1. 禁養寵物 2. 全面禁菸..." />
+                        <div>
+                             <h4 className="text-xs font-bold text-amber-600 uppercase tracking-wider border-b border-amber-100 pb-2 mb-4">特別約定</h4>
+                             <textarea name="contractContent" value={formData.contractContent} onChange={handleInputChange} rows={4} className="w-full border border-stone-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500/20 outline-none" placeholder="例如：不可養寵物、不可開伙..." />
                         </div>
 
                         {mode === 'ADD' && (
-                          <div className="pt-4 border-t border-stone-200 space-y-2.5">
-                            <p className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5 uppercase tracking-wide"><Zap size={12}/> 智慧產帳連動功能</p>
-                            <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-white cursor-pointer transition-all border border-transparent hover:border-amber-100">
-                              <input type="checkbox" checked={genRent} onChange={(e) => setGenRent(e.target.checked)} className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4" />
-                              <span className="text-[11px] font-medium text-stone-600">自動建立第一個月租金帳單</span>
-                            </label>
-                            <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-white cursor-pointer transition-all border border-transparent hover:border-amber-100">
-                              <input type="checkbox" checked={genDeposit} onChange={(e) => setGenDeposit(e.target.checked)} className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4" />
-                              <span className="text-[11px] font-medium text-stone-600">自動建立押金收款紀錄</span>
-                            </label>
-                          </div>
+                             <div className="bg-stone-50 p-4 rounded-lg border border-stone-200">
+                                <h4 className="text-xs font-bold text-stone-700 mb-3">自動建立首期帳單</h4>
+                                <div className="flex gap-6">
+                                    <label className="flex items-center gap-2 text-sm text-stone-600 cursor-pointer">
+                                        <input type="checkbox" checked={genRent} onChange={(e) => setGenRent(e.target.checked)} className="rounded text-amber-600 focus:ring-amber-500" /> 建立首月租金帳單
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-stone-600 cursor-pointer">
+                                        <input type="checkbox" checked={genDeposit} onChange={(e) => setGenDeposit(e.target.checked)} className="rounded text-amber-600 focus:ring-amber-500" /> 建立押金帳單
+                                    </label>
+                                </div>
+                             </div>
                         )}
-                    </div>
-                    <button onClick={handleSave} className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-lg text-xs shadow-md mt-auto transition-transform active:scale-95 flex items-center justify-center gap-2">
-                        <Save size={16} /> {mode === 'ADD' ? '確認新增並同步財務' : '更新租約資料'}
-                    </button>
+
+                        <div className="pt-4 flex justify-end gap-3">
+                            <button type="button" onClick={() => setMode('VIEW')} className="px-6 py-2.5 rounded-lg text-sm font-bold text-stone-500 hover:bg-stone-100 transition">取消</button>
+                            <button type="submit" className="px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-stone-900 hover:bg-black transition shadow-lg flex items-center gap-2">
+                                <Save size={16} /> 儲存資料
+                            </button>
+                        </div>
+                    </form>
                 </div>
-              )}
-
-              <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 space-y-8 bg-stone-50/50 flex flex-col items-center custom-scrollbar">
-                {mode === 'VIEW' && selectedTenant && (
-                  <div className="w-full max-w-2xl space-y-8">
-                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                             <h2 className="text-3xl font-black text-stone-800 tracking-tight">{selectedTenant.name}</h2>
-                             <span className="px-2 py-0.5 bg-stone-100 text-stone-400 rounded text-[9px] font-black uppercase">Active</span>
+             </div>
+          ) : selectedTenant ? (
+             <div className="flex flex-col h-full">
+                {/* View Mode Header */}
+                <div className="px-8 py-6 border-b border-stone-100 flex justify-between items-start bg-gradient-to-r from-stone-50 to-white">
+                    <div>
+                        <div className="flex items-center gap-3 mb-1">
+                            <h2 className="text-2xl font-black text-stone-800">{selectedTenant.name}</h2>
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded uppercase">{selectedTenant.roomNumber} 室</span>
+                            {selectedTenant.fingerprintId && (
+                                <span className="px-2 py-0.5 bg-amber-600 text-white text-[10px] font-bold rounded flex items-center gap-1 shadow-sm"><Fingerprint size={10}/> 指紋 #{selectedTenant.fingerprintId}</span>
+                            )}
                         </div>
-                        <p className="text-stone-400 text-sm font-medium flex items-center gap-2">
-                            <Home size={14} className="text-amber-500" /> {selectedTenant.roomNumber} 號室 • 租約執行中
+                        <p className="text-sm text-stone-500 font-medium flex items-center gap-4">
+                            <span className="flex items-center gap-1"><User size={14}/> {selectedTenant.phone}</span>
+                            <span className="w-1 h-1 bg-stone-300 rounded-full"></span>
+                            <span className="flex items-center gap-1">租期: {selectedTenant.moveInDate} ~ {selectedTenant.leaseEndDate || '未定'}</span>
                         </p>
-                      </div>
-                      <div className="flex gap-2.5 w-full sm:w-auto">
-                        <button onClick={() => setMode('EDIT_INFO')} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white border border-stone-200 rounded-lg text-[11px] font-bold text-stone-600 hover:bg-stone-50 hover:border-amber-200 transition-all shadow-sm whitespace-nowrap">
-                            <Edit size={14} /> 編輯合約
-                        </button>
-                        <button onClick={() => { if(window.confirm('確定要刪除這位租客？相關帳務將一併清除。')) onDeleteTenant(selectedTenant.id); }} className="p-2 bg-rose-50 border border-rose-100 rounded-lg text-rose-500 hover:bg-rose-100 transition-all shadow-sm">
-                            <Trash2 size={16}/>
-                        </button>
-                      </div>
                     </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => setMode('EDIT_INFO')} className="p-2 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-full transition" title="編輯"><Edit size={18} /></button>
+                        <button onClick={() => { if(window.confirm('確定刪除?')) { onDeleteTenant(selectedTenant.id); setSelectedTenantId(null); } }} className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition" title="刪除"><Trash2 size={18} /></button>
+                    </div>
+                </div>
 
-                    {/* Financial Quick View */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="bg-white rounded-xl p-5 border border-stone-100 shadow-sm flex items-center justify-between">
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">最近一筆帳單</p>
-                                {tenantPayments.length > 0 ? (
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-lg font-black text-stone-800">${tenantPayments[0].amount.toLocaleString()}</p>
-                                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${tenantPayments[0].status === PaymentStatus.PAID ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                            {tenantPayments[0].status}
-                                        </span>
+                <div className="flex-1 overflow-y-auto">
+                    <div className="p-8 grid grid-cols-1 xl:grid-cols-2 gap-8">
+                        {/* Financial Card */}
+                        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
+                            <h4 className="text-sm font-bold text-stone-800 mb-4 flex items-center gap-2">
+                                <DollarSign size={16} className="text-emerald-500" /> 財務概況
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="p-3 bg-stone-50 rounded-lg">
+                                    <p className="text-xs text-stone-500 mb-1">每月租金</p>
+                                    <p className="text-lg font-black text-stone-800">${selectedTenant.rentAmount.toLocaleString()}</p>
+                                </div>
+                                <div className="p-3 bg-stone-50 rounded-lg">
+                                    <p className="text-xs text-stone-500 mb-1">押金保管</p>
+                                    <p className="text-lg font-black text-stone-800">${selectedTenant.deposit.toLocaleString()}</p>
+                                </div>
+                            </div>
+                            
+                            <h5 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-3">近期繳費紀錄</h5>
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                                {tenantPayments.length > 0 ? tenantPayments.map(p => (
+                                    <div key={p.id} className="flex justify-between items-center text-sm p-2 hover:bg-stone-50 rounded border border-transparent hover:border-stone-100 transition">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-1.5 h-1.5 rounded-full ${p.status === '已繳' ? 'bg-emerald-500' : p.status === '逾期' ? 'bg-rose-500' : 'bg-amber-400'}`}></div>
+                                            <span className="text-stone-700 font-medium">{p.dueDate}</span>
+                                            <span className="text-xs text-stone-400 bg-stone-100 px-1.5 rounded">{p.type === 'Rent' ? '租金' : '水電'}</span>
+                                        </div>
+                                        <span className="font-bold text-stone-600">${p.amount.toLocaleString()}</span>
                                     </div>
-                                ) : <p className="text-sm font-bold text-stone-300 italic">尚無數據</p>}
-                            </div>
-                            <div className="p-3 bg-amber-50 rounded-full text-amber-500">
-                                <DollarSign size={20} />
+                                )) : <p className="text-xs text-stone-300 italic text-center py-4">尚無繳費紀錄</p>}
                             </div>
                         </div>
-                        <div className="bg-white rounded-xl p-5 border border-stone-100 shadow-sm flex items-center justify-between">
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">租約剩餘天數</p>
-                                <p className="text-lg font-black text-stone-800">
-                                    {selectedTenant.leaseEndDate ? Math.max(0, Math.ceil((new Date(selectedTenant.leaseEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : '---'} <span className="text-xs text-stone-400 font-bold">Days</span>
-                                </p>
-                            </div>
-                            <div className="p-3 bg-stone-50 rounded-full text-stone-400">
-                                <Clock size={20} />
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Paper Contract Component - Adjusted padding for mobile */}
-                    <div className="w-full bg-[#fdfcf8] rounded-md p-6 md:p-12 font-serif text-stone-900 leading-[1.8] text-base border border-stone-200 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)] relative overflow-hidden animate-in fade-in zoom-in-95 duration-700">
-                       <div className="absolute top-0 left-0 w-full h-1 bg-amber-600/20"></div>
-                       <div className="flex justify-between items-center mb-6 md:mb-10 border-b-2 border-stone-900 pb-4">
-                          <h1 className="text-xl md:text-2xl font-black tracking-[0.3em] uppercase">住宅租賃契約書</h1>
-                          <Printer size={18} className="text-stone-300 hover:text-stone-900 cursor-pointer transition-colors" />
-                       </div>
-                       
-                       <div className="space-y-8 tracking-tight">
-                           <pre className="whitespace-pre-wrap font-serif text-[13px] md:text-[15px] leading-relaxed text-stone-800">
+                        {/* Contract Preview */}
+                        <div className="bg-stone-50 rounded-xl border border-stone-200 p-6 shadow-inner flex flex-col">
+                             <div className="flex justify-between items-center mb-4">
+                                <h4 className="text-sm font-bold text-stone-800 flex items-center gap-2">
+                                    <FileText size={16} className="text-amber-600" /> 租賃合約預覽
+                                </h4>
+                                <button onClick={downloadContract} className="text-xs bg-white border border-stone-300 px-3 py-1.5 rounded hover:bg-stone-100 text-stone-600 font-bold flex items-center gap-1 transition">
+                                    <Printer size={12} /> 下載合約
+                                </button>
+                             </div>
+                             <div className="flex-1 bg-white border border-stone-200 rounded p-4 text-[10px] text-stone-600 font-mono leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[400px]">
                                 {renderContractText(selectedTenant)}
-                           </pre>
-                       </div>
-                       
-                       <div className="mt-10 md:mt-16 pt-8 border-t border-stone-100 flex justify-between items-center opacity-40">
-                          <div className="text-[10px] font-bold tracking-widest">LANDLORD OFFICE INTERNAL USE ONLY</div>
-                          <div className="text-[10px] font-bold">PAGE 01 / 01</div>
-                       </div>
+                             </div>
+                        </div>
                     </div>
-                  </div>
-                )}
-                
-                {mode === 'ADD' && (
-                  <div className="w-full max-w-2xl text-center space-y-4">
-                     <div className="bg-amber-50 p-6 rounded-full inline-block mb-4">
-                        <FileText size={48} className="text-amber-200" />
-                     </div>
-                     <h3 className="text-2xl font-black text-stone-800">建立新租約</h3>
-                     <p className="text-stone-400 max-w-sm mx-auto text-sm leading-relaxed">請在左側面板填寫承租人基本資訊，系統將自動生成標準住宅租賃契約預覽。</p>
-                  </div>
-                )}
-              </div>
-            </div>
+                </div>
+             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-stone-50/20">
-              <div className="relative mb-6">
-                <div className="absolute -inset-4 bg-amber-50 rounded-full blur-xl opacity-50 animate-pulse"></div>
-                <Users size={48} className="text-stone-200 relative" />
-              </div>
-              <h3 className="text-lg font-bold text-stone-700 tracking-tight">選取租客以檢視合約詳情</h3>
-              <p className="text-xs text-stone-400 mt-2 font-medium">您可以進行租約檢視、編輯、以及確認租客的繳費狀態連動。</p>
-              <button onClick={() => setMode('ADD')} className="mt-8 px-6 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-600 hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700 transition-all shadow-sm">
-                快速新增首位租客
-              </button>
-            </div>
+             <div className="flex-1 flex flex-col items-center justify-center text-stone-300 p-8">
+                <Users size={48} className="mb-4 opacity-50" />
+                <p className="font-medium">請選擇左側租客以查看詳情</p>
+                <p className="text-xs mt-2">或點擊上方新增按鈕建立新租客資料</p>
+             </div>
           )}
         </div>
       </div>
