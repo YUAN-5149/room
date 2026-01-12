@@ -23,6 +23,7 @@ export const GOOGLE_SCRIPT_MAINTENANCE_URL = "https://script.google.com/macros/s
 
 // ============================================================================
 // 設定 5: 飲水機濾心管理 Sheet (Filters)
+// 對應 Spreadsheet: https://docs.google.com/spreadsheets/d/1b8mzxeuzyQskMIdXrLcFBH5P37mKUnMKIiZW0TB_mO4/edit?gid=0#gid=0
 // ============================================================================
 export const GOOGLE_SCRIPT_FILTER_URL = "https://script.google.com/macros/s/AKfycbzD48CCREG2Y6o5a1ET74o2Wt56CBftpbaSFex3m2xv3ymXNcoykfWwMeAkpp_NTc8Y/exec"; 
 

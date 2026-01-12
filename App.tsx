@@ -93,33 +93,34 @@ const App: React.FC = () => {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Using '_v2' suffix to force clear old localStorage data and load new mockData
   const [tenants, setTenants] = useState<Tenant[]>(() => {
-    const saved = localStorage.getItem('sl_tenants');
+    const saved = localStorage.getItem('sl_tenants_v2');
     return saved !== null ? JSON.parse(saved) : mockTenants;
   });
 
   const [payments, setPayments] = useState<PaymentRecord[]>(() => {
-    const saved = localStorage.getItem('sl_payments');
+    const saved = localStorage.getItem('sl_payments_v2');
     return saved !== null ? JSON.parse(saved) : mockPayments;
   });
 
   const [tickets, setTickets] = useState<MaintenanceTicket[]>(() => {
-    const saved = localStorage.getItem('sl_tickets');
+    const saved = localStorage.getItem('sl_tickets_v2');
     return saved !== null ? JSON.parse(saved) : mockTickets;
   });
 
   const [filters, setFilters] = useState<FilterSchedule[]>(() => {
-    const saved = localStorage.getItem('sl_filters');
+    const saved = localStorage.getItem('sl_filters_v2');
     return saved !== null ? JSON.parse(saved) : mockFilters;
   });
 
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => {
-    const saved = localStorage.getItem('sl_expenses');
+    const saved = localStorage.getItem('sl_expenses_v2');
     return saved !== null ? JSON.parse(saved) : mockExpenses;
   });
 
   const [meterReadings, setMeterReadings] = useState<MeterReading[]>(() => {
-    const saved = localStorage.getItem('sl_meters');
+    const saved = localStorage.getItem('sl_meters_v2');
     return saved !== null ? JSON.parse(saved) : mockReadings;
   });
 
@@ -144,9 +145,10 @@ const App: React.FC = () => {
           if (cloudMaintenance.repairs.length > 0) {
               setTickets(cloudMaintenance.repairs);
           }
-          if (cloudMaintenance.filters.length > 0) {
-              setFilters(cloudMaintenance.filters);
-          }
+          // Temporarily disable overwriting filters from cloud to ensure mock data (new specs) is shown
+          // if (cloudMaintenance.filters.length > 0) {
+          //    setFilters(cloudMaintenance.filters);
+          // }
       }
 
       // 5. Meters
@@ -156,12 +158,12 @@ const App: React.FC = () => {
     loadFromCloud();
   }, []);
 
-  useEffect(() => { localStorage.setItem('sl_tenants', JSON.stringify(tenants)); }, [tenants]);
-  useEffect(() => { localStorage.setItem('sl_payments', JSON.stringify(payments)); }, [payments]);
-  useEffect(() => { localStorage.setItem('sl_tickets', JSON.stringify(tickets)); }, [tickets]);
-  useEffect(() => { localStorage.setItem('sl_expenses', JSON.stringify(expenses)); }, [expenses]);
-  useEffect(() => { localStorage.setItem('sl_filters', JSON.stringify(filters)); }, [filters]);
-  useEffect(() => { localStorage.setItem('sl_meters', JSON.stringify(meterReadings)); }, [meterReadings]);
+  useEffect(() => { localStorage.setItem('sl_tenants_v2', JSON.stringify(tenants)); }, [tenants]);
+  useEffect(() => { localStorage.setItem('sl_payments_v2', JSON.stringify(payments)); }, [payments]);
+  useEffect(() => { localStorage.setItem('sl_tickets_v2', JSON.stringify(tickets)); }, [tickets]);
+  useEffect(() => { localStorage.setItem('sl_expenses_v2', JSON.stringify(expenses)); }, [expenses]);
+  useEffect(() => { localStorage.setItem('sl_filters_v2', JSON.stringify(filters)); }, [filters]);
+  useEffect(() => { localStorage.setItem('sl_meters_v2', JSON.stringify(meterReadings)); }, [meterReadings]);
 
   const handleLogin = (phone: string) => {
     const verifiedUser = verifyUser(phone);
@@ -301,11 +303,8 @@ const App: React.FC = () => {
   };
 
   const handleDeleteReading = (id: string) => {
-    console.log("App: processing delete reading for:", id); // Debug Log
-    // 強制轉型 string 確保比對正確
     setMeterReadings(prev => {
         const afterDelete = prev.filter(r => String(r.id) !== String(id));
-        console.log("App: remaining count:", afterDelete.length);
         return afterDelete;
     });
     syncMeterToSheet('DELETE', { id });

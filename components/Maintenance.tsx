@@ -101,11 +101,11 @@ const Maintenance: React.FC<MaintenanceProps> = ({
 
   const getModelBgColor = (model: string) => {
     switch (model) {
-      case 'UF-591': return 'bg-blue-100/70';
-      case 'UF-592': return 'bg-green-100/70';
-      case 'UF-504': return 'bg-sky-50';
-      case 'UF-28': return 'bg-yellow-100/70';
-      case 'UF-515': return 'bg-orange-100/70';
+      case 'UF-591': return 'bg-blue-100';    // 藍底色
+      case 'UF-592': return 'bg-green-100';   // 綠底色
+      case 'UF-504': return 'bg-sky-100';     // 水藍底色
+      case 'UF-28':  return 'bg-yellow-100';  // 黃底色
+      case 'UF-515': return 'bg-orange-100';  // 橘底色
       default: return 'bg-white';
     }
   };
